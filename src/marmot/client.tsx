@@ -20,8 +20,7 @@ import { createKVStore } from "./storage";
 import { NdkNetworkAdapter } from "./network";
 
 import type { MarmotGroup } from "@internet-privacy/marmot-ts";
-
-const DEFAULT_RELAYS = ["ws://localhost:7777"];
+import { DEFAULT_RELAYS } from "../config/relays";
 
 interface MarmotContextValue {
   client: MarmotClient | null;

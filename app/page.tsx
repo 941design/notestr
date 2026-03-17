@@ -17,10 +17,7 @@ import { ThemeToggle } from "../src/components/ThemeToggle";
 import { GroupManager } from "../src/components/GroupManager";
 import { Board } from "../src/components/Board";
 import type { EventSigner } from "applesauce-core";
-
-const DEFAULT_RELAYS = ["ws://localhost:7777"];
-// Amber can't reach localhost — nostrconnect flow needs a public relay
-const NOSTRCONNECT_RELAY = "wss://relay.damus.io";
+import { DEFAULT_RELAYS, NOSTRCONNECT_RELAY } from "../src/config/relays";
 
 type AuthMethod = "nip07" | "nip46" | null;
 type LoginTab = "amber" | "bunker";

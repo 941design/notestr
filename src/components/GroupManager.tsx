@@ -11,7 +11,7 @@ export function GroupManager({
   onGroupSelect,
   selectedGroupId,
 }: GroupManagerProps) {
-  const { client, groups, loading } = useMarmot();
+  const { client, groups, relays, loading } = useMarmot();
   const [newGroupName, setNewGroupName] = useState("");
   const [inviteNpub, setInviteNpub] = useState("");
   const [creating, setCreating] = useState(false);
@@ -25,7 +25,7 @@ export function GroupManager({
     setError(null);
     try {
       const group = await client.createGroup(newGroupName.trim(), {
-        relays: ["ws://localhost:7777"],
+        relays,
       });
       setNewGroupName("");
       onGroupSelect(group.idStr);
