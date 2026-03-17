@@ -20,7 +20,7 @@ import { createKVStore } from "./storage";
 import { NdkNetworkAdapter } from "./network";
 
 import type { MarmotGroup } from "@internet-privacy/marmot-ts";
-import { DEFAULT_RELAYS } from "../config/relays";
+import { DEFAULT_RELAYS, NDK_CONNECT_TIMEOUT_MS } from "../config/relays";
 
 interface MarmotContextValue {
   client: MarmotClient | null;
@@ -71,7 +71,7 @@ export function MarmotProvider({
     try {
       const ndk = new NDK({ explicitRelayUrls: relays });
       ndkRef.current = ndk;
-      await ndk.connect();
+      await ndk.connect(NDK_CONNECT_TIMEOUT_MS);
 
       if (!mountedRef.current) return;
 

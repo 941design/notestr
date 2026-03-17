@@ -2,6 +2,7 @@ import type { EventSigner } from "applesauce-core";
 import { decode, npubEncode } from "nostr-tools/nip19";
 import NDK, { NDKNip46Signer, NDKPrivateKeySigner, NDKUser } from "@nostr-dev-kit/ndk";
 import { getEventHash } from "nostr-tools/pure";
+import { NDK_CONNECT_TIMEOUT_MS } from "@/config/relays";
 
 const NIP46_LOCAL_KEY = "notestr-nip46-local-key";
 const NIP46_PAYLOAD = "notestr-nip46-payload";
@@ -69,7 +70,7 @@ export async function connectBunker(
   relays: string[],
 ): Promise<Nip46Connection> {
   const ndk = new NDK({ explicitRelayUrls: relays });
-  await ndk.connect();
+  await ndk.connect(NDK_CONNECT_TIMEOUT_MS);
 
   // Restore local key if we have one, for session continuity
   const savedKey = localStorage.getItem(NIP46_LOCAL_KEY) ?? undefined;
@@ -100,7 +101,7 @@ export async function restoreNip46Session(
 
   try {
     const ndk = new NDK({ explicitRelayUrls: relays });
-    await ndk.connect();
+    await ndk.connect(NDK_CONNECT_TIMEOUT_MS);
 
     const nip46 = await NDKNip46Signer.fromPayload(payload, ndk);
     await nip46.blockUntilReady();
@@ -153,7 +154,7 @@ export function startNostrConnect(
   };
 
   const connection = (async (): Promise<Nip46Connection> => {
-    await ndk.connect();
+    await ndk.connect(NDK_CONNECT_TIMEOUT_MS);
     await signer.blockUntilReady();
     if (cancelled) throw new Error("Cancelled");
 

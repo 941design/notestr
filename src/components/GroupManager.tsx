@@ -16,7 +16,7 @@ export function GroupManager({
   onGroupSelect,
   selectedGroupId,
 }: GroupManagerProps) {
-  const { client, groups, relays, loading } = useMarmot();
+  const { client, groups, relays, loading, error: marmotError } = useMarmot();
   const [newGroupName, setNewGroupName] = useState("");
   const [inviteNpub, setInviteNpub] = useState("");
   const [creating, setCreating] = useState(false);
@@ -66,6 +66,12 @@ export function GroupManager({
 
       {loading && (
         <p className="text-sm text-muted-foreground">Loading groups...</p>
+      )}
+
+      {marmotError && (
+        <p className="mb-3 text-sm text-destructive">
+          {marmotError.message}
+        </p>
       )}
 
       <ul className="mb-5 space-y-1">

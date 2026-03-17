@@ -37,6 +37,7 @@ export default function Page() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [signerChecked, setSignerChecked] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   // Bunker login state
   const [bunkerUrl, setBunkerUrl] = useState("");
@@ -84,6 +85,10 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    setIsAndroid(/Android/i.test(window.navigator.userAgent));
   }, []);
 
   const handleNip07Connect = useCallback(async () => {
@@ -257,11 +262,7 @@ export default function Page() {
                             fgColor="currentColor"
                             className="rounded-lg"
                           />
-                          {/Android/i.test(
-                            typeof navigator !== "undefined"
-                              ? navigator.userAgent
-                              : "",
-                          ) && (
+                          {isAndroid && (
                             <Button className="w-full" asChild>
                               <a href={nostrConnectUri}>Open in Amber</a>
                             </Button>

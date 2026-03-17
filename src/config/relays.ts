@@ -2,25 +2,30 @@
  * Central relay configuration — single source of truth.
  *
  * Override at build time with NEXT_PUBLIC_ env vars (comma-separated):
- *   NEXT_PUBLIC_RELAYS="wss://relay.damus.io,wss://nos.lol"
- *   NEXT_PUBLIC_NOSTRCONNECT_RELAY="wss://relay.damus.io"
+ *   NEXT_PUBLIC_RELAYS="wss://nos.lol,wss://relay.primal.net"
+ *   NEXT_PUBLIC_NOSTRCONNECT_RELAY="wss://relay.primal.net"
  *
  * Defaults: localhost in development, public relays in production.
  */
 
 const PRODUCTION_RELAYS = [
-  "wss://relay.damus.io",
   "wss://nos.lol",
-  "wss://relay.nostr.band",
+  "wss://relay.primal.net",
+  "wss://purplepag.es",
+  "wss://offchain.pub",
 ];
 
 const DEV_RELAYS = ["ws://localhost:7777"];
+export const NDK_CONNECT_TIMEOUT_MS = 4_000;
 
 const isProduction = process.env.NODE_ENV === "production";
 
 function parseRelays(envVar: string | undefined, fallback: string[]): string[] {
-  if (!envVar) return fallback;
-  return envVar.split(",").map((r) => r.trim()).filter(Boolean);
+  const source = envVar
+    ? envVar.split(",").map((relay) => relay.trim())
+    : fallback;
+
+  return Array.from(new Set(source.filter(Boolean)));
 }
 
 export const DEFAULT_RELAYS: string[] = parseRelays(
@@ -29,4 +34,4 @@ export const DEFAULT_RELAYS: string[] = parseRelays(
 );
 
 export const NOSTRCONNECT_RELAY: string =
-  process.env.NEXT_PUBLIC_NOSTRCONNECT_RELAY || "wss://relay.damus.io";
+  process.env.NEXT_PUBLIC_NOSTRCONNECT_RELAY || "wss://relay.primal.net";
