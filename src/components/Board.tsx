@@ -76,6 +76,7 @@ export function Board({ currentUserPubkey }: BoardProps) {
           return (
             <div
               key={status}
+              data-column={status}
               className="flex min-h-[300px] flex-col rounded-lg border bg-card p-3"
             >
               <div className="mb-3 flex items-center justify-between border-b pb-2">

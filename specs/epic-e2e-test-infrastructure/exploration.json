@@ -1,0 +1,55 @@
+{
+  "created_at": "2026-03-17T00:00:00Z",
+  "key_files": [
+    { "path": "vitest.config.ts", "lines": "9", "relevance": "Existing test config; E2E needs a separate playwright.config.ts with its own testDir and globalSetup", "source": "testing-and-conventions" },
+    { "path": "Makefile", "lines": "108", "relevance": "All dev workflows go through Make; e2e target must follow phony + ## help comment pattern; uses docker compose V2 (space not hyphen)", "source": "testing-and-conventions" },
+    { "path": "docker-compose.yml", "lines": "12", "relevance": "Existing relay service definition; e2e compose adds bunker+app (or keeps bunker in Docker, app on host); reuses strfry.conf mount", "source": "architecture" },
+    { "path": "strfry.conf", "lines": "54", "relevance": "Relay config tuned for dev; no write-policy plugin so all events accepted; port 7777; can be reused verbatim for E2E relay", "source": "architecture" },
+    { "path": ".env.example", "lines": "9", "relevance": "Documents all NEXT_PUBLIC_ env overrides; E2E build env vars should be documented here", "source": "testing-and-conventions" },
+    { "path": "next.config.ts", "lines": "29", "relevance": "output: 'export' (static); basePath='/notestr' only when NODE_ENV=production; E2E build uses NODE_ENV=test to get no basePath", "source": "architecture" },
+    { "path": "src/lib/nostr.ts", "lines": "188", "relevance": "connectBunker() / restoreNip46Session() are the exact paths Playwright exercises; session stored in localStorage at 'notestr-nip46-payload'", "source": "similar-features" },
+    { "path": "src/config/relays.ts", "lines": "37", "relevance": "NEXT_PUBLIC_RELAYS baked in at build time; E2E build must set this to ws://localhost:7777", "source": "architecture" },
+    { "path": "src/store/task-reducer.test.ts", "lines": "196", "relevance": "Establishes describe/it/expect style; explicit vitest imports (no globals); co-located test pattern", "source": "testing-and-conventions" },
+    { "path": "package.json", "lines": "49", "relevance": "Missing: @playwright/test, serve (static server). NDK ^3.0.3 already present — NDKNip46Backend is in that package", "source": "testing-and-conventions" }
+  ],
+  "patterns": [
+    { "name": "Co-located unit tests", "description": "test files sit next to module they test, named <module>.test.ts", "reference": "src/store/task-reducer.test.ts:1" },
+    { "name": "Explicit vitest imports", "description": "No globals; every test file imports describe/it/expect from 'vitest'", "reference": "src/store/task-reducer.test.ts:1" },
+    { "name": "Make as sole task runner", "description": "All build/test/dev/relay commands go through make; npm scripts are thin aliases", "reference": "Makefile:43-56" },
+    { "name": "Inline ## help comments", "description": "Makefile targets use ## comment for auto-generated help output", "reference": "Makefile:27" },
+    { "name": "Platform-stamped node_modules", "description": "node_modules target writes uname -sm to .platform and re-installs on platform change", "reference": "Makefile:31-41" },
+    { "name": "NEXT_PUBLIC_ relay override", "description": "Relay URLs baked into static bundle via env var; not runtime-configurable", "reference": "src/config/relays.ts:22-34" },
+    { "name": "Single NDK connect pattern", "description": "new NDK → connect(timeout) → signer.blockUntilReady() used everywhere", "reference": "src/lib/nostr.ts:72-78" },
+    { "name": "Docker Compose V2 syntax", "description": "`docker compose` (space) not `docker-compose` (hyphen) throughout", "reference": "Makefile:54-55" }
+  ],
+  "similar_features": [
+    { "name": "NIP-46 bunker connect", "description": "connectBunker() in src/lib/nostr.ts; NDKNip46Signer.bunker(ndk, url, localKey)", "reference": "src/lib/nostr.ts:68-91" },
+    { "name": "Relay health check pattern", "description": "ndk.connect(NDK_CONNECT_TIMEOUT_MS) with 4s timeout is the existing connect pattern", "reference": "src/lib/nostr.ts:73" }
+  ],
+  "architecture": {
+    "app_output": "Static export to ./out (output: 'export' in next.config.ts:11)",
+    "relay": "strfry via Docker, port 7777, no auth required",
+    "nip46_flow": "Browser opens NDK → NDKNip46Signer.bunker() → blockUntilReady() → stores session in localStorage",
+    "mls_groups": "MarmotClient from marmot-ts wraps NDK; group state stored in IndexedDB via idb-keyval",
+    "task_events": "Task state as Nostr events inside MLS groups; task-store.tsx / task-reducer.ts manage local state"
+  },
+  "extension_points": [
+    "package.json devDependencies — add @playwright/test, serve",
+    "Makefile — add e2e and e2e-install targets",
+    "docker-compose.e2e.yml — add relay with ephemeral volume",
+    "playwright.config.ts — new file at repo root",
+    "e2e/ directory — new directory for fixtures and tests"
+  ],
+  "testing": {
+    "framework": "Vitest 4.1 for unit tests; Playwright needed for E2E",
+    "unit_test_pattern": "co-located .test.ts files, no globals, explicit vitest imports",
+    "e2e_gap": "No E2E setup exists; no @playwright/test in devDependencies",
+    "browser_env": "Static app needs serve to host ./out; Playwright connects to http://localhost:3100"
+  },
+  "conventions": [
+    "TypeScript throughout (all .ts/.tsx); bunker fixture uses .mjs (ESM, top-level await)",
+    "project is 'type': 'module' — ES modules throughout",
+    "NODE_ENV=test for E2E build avoids basePath=/notestr",
+    "docker compose V2 (space) not V1 (hyphen)"
+  ]
+}

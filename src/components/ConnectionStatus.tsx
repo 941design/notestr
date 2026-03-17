@@ -27,7 +27,7 @@ export function ConnectionStatus({
   const label = authMethod === "nip46" ? "bunker" : "NIP-07";
 
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex items-center gap-2 text-sm" data-testid="pubkey-chip">
       <span className="size-2 shrink-0 rounded-full bg-success shadow-[0_0_6px] shadow-success" />
       <span
         className="font-mono text-muted-foreground"
@@ -38,7 +38,7 @@ export function ConnectionStatus({
       <Badge variant="secondary" className="text-xs uppercase tracking-wide">
         {label}
       </Badge>
-      <Button variant="outline" size="sm" onClick={onDisconnect}>
+      <Button variant="outline" size="sm" onClick={onDisconnect} data-testid="disconnect-button">
         <LogOut className="size-3.5" />
         Disconnect
       </Button>

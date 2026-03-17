@@ -2,7 +2,7 @@
 -include .env
 export
 
-.PHONY: help build test dev relay-up relay-down clean deploy deploy-check deploy-dryrun
+.PHONY: help build test dev relay-up relay-down clean deploy deploy-check deploy-dryrun e2e-up e2e-down e2e-install e2e
 
 # Default target
 .DEFAULT_GOAL := help
@@ -55,6 +55,23 @@ relay-up: ## Start local strfry relay (Docker)
 
 relay-down: ## Stop local strfry relay
 	docker compose down
+
+e2e-up: ## Start ephemeral E2E relay (Docker)
+	docker compose -f docker-compose.e2e.yml up -d
+
+e2e-down: ## Stop ephemeral E2E relay and wipe state
+	docker compose -f docker-compose.e2e.yml down -v
+
+e2e-install: node_modules ## Install Playwright and browser binaries
+	npm install
+	npx playwright install --with-deps chromium
+
+e2e: node_modules ## Run end-to-end tests (relay up → playwright → relay down)
+	@$(MAKE) e2e-up; \
+	exit_code=0; \
+	npx playwright test || exit_code=$$?; \
+	$(MAKE) e2e-down; \
+	exit $$exit_code
 
 clean: ## Remove build artifacts
 	rm -rf out .next

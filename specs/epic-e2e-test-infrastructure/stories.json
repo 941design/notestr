@@ -1,0 +1,342 @@
+{
+  "epic_name": "e2e-test-infrastructure",
+  "created_at": "2026-03-17T00:00:00Z",
+  "updated_at": "2026-03-17T00:00:00Z",
+  "total_stories": 5,
+
+  "stories": [
+    {
+      "id": "01",
+      "name": "docker-compose-relay-setup",
+      "title": "Add docker-compose.e2e.yml with ephemeral strfry relay",
+      "description": "Create docker-compose.e2e.yml defining a strfry relay on port 7777 with a tmpfs (ephemeral) volume so relay state is wiped on every run. Reuse ./strfry.conf. Add Makefile targets e2e-up and e2e-down following the existing phony + ## help comment pattern and using docker compose V2 syntax (space, not hyphen).",
+      "acceptance_criteria": ["AC-005"],
+      "scope": {
+        "includes": [
+          "docker-compose.e2e.yml with relay service (strfry image, port 7777, tmpfs volume, strfry.conf mount)",
+          "Makefile target e2e-up: docker compose -f docker-compose.e2e.yml up -d",
+          "Makefile target e2e-down: docker compose -f docker-compose.e2e.yml down -v",
+          "Both targets annotated with ## help comments and listed under .PHONY"
+        ],
+        "excludes": [
+          "Playwright configuration",
+          "Bunker fixture",
+          "App build step",
+          "Full make e2e orchestration target (that is Story 03)"
+        ]
+      },
+      "complexity": "low",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "relay-starts-and-accepts-websocket",
+            "description": "Verify docker-compose.e2e.yml brings up the relay and a WebSocket client can connect, then down -v leaves no persistent volume.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Run: docker compose -f docker-compose.e2e.yml up -d",
+              "Run: npx wscat -c ws://localhost:7777 --execute '' (or equivalent one-shot connection check)",
+              "Run: docker compose -f docker-compose.e2e.yml down -v",
+              "Run: docker volume ls"
+            ],
+            "assertions": [
+              "wscat connection exits without 'connection refused' error",
+              "docker volume ls output does not contain a relay data volume after down -v"
+            ]
+          }
+        ],
+        "playwright_file": "tests/e2e/story-01-relay.spec.ts"
+      },
+      "status": "pending",
+      "notes": "Foundation story. No application code changes. strfry.conf already exists and accepts all events. docker compose V2 (space) as established by exploration patterns."
+    },
+
+    {
+      "id": "02",
+      "name": "bunker-fixture",
+      "title": "Write e2e/fixtures/bunker.mjs NIP-46 bunker fixture",
+      "description": "Create e2e/fixtures/bunker.mjs as a Node ESM module (top-level await). It instantiates NDKNip46Backend from @nostr-dev-kit/ndk (already at ^3.0.3 in package.json), connects to ws://localhost:7777, and starts the bunker. The file declares E2E_BUNKER_NSEC as a hardcoded constant (deterministic test private key), derives the corresponding public key, exports E2E_BUNKER_URL as `bunker://<HEX_PUBKEY>?relay=ws%3A%2F%2Flocalhost%3A7777`, and logs a ready message to stdout when the backend is active.",
+      "acceptance_criteria": ["AC-009"],
+      "scope": {
+        "includes": [
+          "e2e/fixtures/bunker.mjs with E2E_BUNKER_NSEC constant (hardcoded test nsec)",
+          "NDKNip46Backend instantiation connecting to ws://localhost:7777",
+          "E2E_BUNKER_URL export derived from E2E_BUNKER_NSEC public key",
+          "stdout ready log when bunker is listening",
+          "Script is runnable standalone: node e2e/fixtures/bunker.mjs"
+        ],
+        "excludes": [
+          "Playwright globalSetup integration (that is Story 03)",
+          "NDK headless client fixture (that is Story 03)",
+          "Any Makefile targets beyond what Story 01 adds"
+        ]
+      },
+      "complexity": "medium",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "bunker-logs-ready",
+            "description": "With relay running, execute bunker.mjs standalone and confirm it logs a ready message within 5 seconds and E2E_BUNKER_URL matches expected pattern.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Run: docker compose -f docker-compose.e2e.yml up -d",
+              "Run: node e2e/fixtures/bunker.mjs & (background, capture stdout)",
+              "Wait up to 5 seconds for 'ready' in stdout",
+              "Print E2E_BUNKER_URL and verify format"
+            ],
+            "assertions": [
+              "stdout contains a ready/listening message within 5 seconds",
+              "E2E_BUNKER_URL matches pattern bunker://<64-char-hex>?relay=ws%3A%2F%2Flocalhost%3A7777"
+            ]
+          }
+        ],
+        "playwright_file": "tests/e2e/story-02-bunker.spec.ts"
+      },
+      "status": "pending",
+      "notes": "NDK ^3.0.3 is already installed (exploration: package.json). NDKNip46Backend is part of that package. File uses .mjs extension because it needs top-level await and project is 'type': 'module'. The deterministic nsec ensures E2E_BUNKER_URL is stable across runs."
+    },
+
+    {
+      "id": "03",
+      "name": "playwright-setup",
+      "title": "Install Playwright and wire globalSetup, globalTeardown, and NDK fixture",
+      "description": "Add @playwright/test and serve to devDependencies. Write playwright.config.ts at the repo root with baseURL: 'http://localhost:3100', testDir: './e2e/tests', globalSetup, and globalTeardown. Write the globalSetup module that: (1) builds the app with NODE_ENV=test NEXT_PUBLIC_RELAYS=ws://localhost:7777 npx next build, (2) starts node e2e/fixtures/bunker.mjs as a child process and waits for its ready log, (3) starts npx serve out -l 3100 and waits for HTTP 200 on http://localhost:3100. Write globalTeardown to kill the child processes. Write e2e/fixtures/ndk-client.ts as a Playwright fixture extending test with an ndkClient fixture (headless NDK with NDKPrivateKeySigner, second deterministic test keypair). Add make e2e-install target (npm install + npx playwright install --with-deps chromium) and make e2e target that orchestrates: e2e-up, globalSetup (via playwright), npx playwright test, globalTeardown (via playwright), e2e-down. Verify make e2e exits 0 with an empty test suite.",
+      "acceptance_criteria": ["AC-001", "AC-006", "AC-010", "AC-011", "AC-012"],
+      "scope": {
+        "includes": [
+          "package.json devDependencies: @playwright/test, serve",
+          "playwright.config.ts: baseURL http://localhost:3100, testDir ./e2e/tests, globalSetup, globalTeardown",
+          "e2e/global-setup.ts: app build (NODE_ENV=test NEXT_PUBLIC_RELAYS=ws://localhost:7777), bunker child process, serve child process, readiness waits",
+          "e2e/global-teardown.ts: kill bunker and serve processes",
+          "e2e/fixtures/ndk-client.ts: Playwright test fixture with headless NDK, NDKPrivateKeySigner (second test keypair), ndk.connect()",
+          "Makefile target e2e-install: npm install + npx playwright install --with-deps chromium (with ## comment, .PHONY)",
+          "Makefile target e2e: e2e-up + npx playwright test + e2e-down in sequence (with ## comment, .PHONY)"
+        ],
+        "excludes": [
+          "Actual test spec files (those are Stories 04 and 05)",
+          "strfry relay Docker config (Story 01)",
+          "Bunker fixture script content (Story 02)"
+        ]
+      },
+      "complexity": "high",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [
+        {
+          "fixture_id": "FIXTURE-03-001",
+          "description": "Headless NDK client (e2e/fixtures/ndk-client.ts) using a second deterministic test keypair. Acts as a second Nostr user for relay event verification in tests. Not a replacement for any production component — permanent test infrastructure.",
+          "interface": "NDK (from @nostr-dev-kit/ndk)",
+          "reason": "Cannot use a real user's keypair in CI; fixture provides a stable, isolated second identity for relay-level assertions.",
+          "permanent": true
+        }
+      ],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "empty-suite-exits-zero",
+            "description": "With no test spec files present, make e2e builds the app, starts services, runs Playwright (zero tests), and exits 0.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Ensure e2e/tests/ directory is empty (no .spec.ts files)",
+              "Run: make e2e-install",
+              "Run: make e2e"
+            ],
+            "assertions": [
+              "make e2e exits with code 0",
+              "Output shows relay started (docker compose up)",
+              "Output shows app built (next build completed)",
+              "Output shows 0 tests passed (Playwright empty run)",
+              "Output shows relay stopped (docker compose down)"
+            ]
+          }
+        ],
+        "playwright_file": "tests/e2e/story-03-setup.spec.ts"
+      },
+      "status": "pending",
+      "notes": "This is the most complex story as it wires all infrastructure together. The Makefile e2e target must handle failure gracefully — if playwright test fails, e2e-down should still run (use make -k or a shell trap pattern). Readiness checks in globalSetup: poll http://localhost:3100 with fetch() until 200, poll relay with a WebSocket connection until open."
+    },
+
+    {
+      "id": "04",
+      "name": "auth-e2e-tests",
+      "title": "Write auth.spec.ts covering NIP-46 bunker authentication flows",
+      "description": "Write e2e/tests/auth.spec.ts with three test cases: (1) full auth flow — navigate to app, select bunker tab, paste E2E_BUNKER_URL, click Connect, assert pubkey chip visible in header and localStorage has notestr-nip46-payload; (2) session restore — after auth, call page.reload() and assert pubkey chip still visible without re-authenticating; (3) disconnect — after auth, click disconnect, assert pubkey chip gone, sign-in UI visible, and localStorage key cleared. Each test clears localStorage before starting via page.evaluate(() => localStorage.clear()).",
+      "acceptance_criteria": ["AC-002", "AC-007", "AC-008"],
+      "scope": {
+        "includes": [
+          "e2e/tests/auth.spec.ts with three test cases: full auth flow, session restore, disconnect",
+          "Use of E2E_BUNKER_URL (imported from bunker.mjs or set via playwright.config.ts env)",
+          "localStorage assertions via page.evaluate()",
+          "pubkey chip selector assertion (page.locator for the chip element)",
+          "sign-in screen visibility assertion after disconnect",
+          "localStorage.clear() before each test"
+        ],
+        "excludes": [
+          "Group or task flows (Story 05)",
+          "NIP-07 browser extension auth (out of scope for this epic)",
+          "nostrconnect:// URL auth (out of scope for this epic)"
+        ]
+      },
+      "complexity": "medium",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "bunker-auth-flow",
+            "description": "User navigates to app, selects bunker tab, pastes URL, connects, sees pubkey chip.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Navigate to http://localhost:3100",
+              "Click 'bunker:// URL' tab",
+              "Paste E2E_BUNKER_URL into the input",
+              "Click Connect button",
+              "Wait for pubkey chip to appear in header"
+            ],
+            "assertions": [
+              "page.locator('[data-testid=\"pubkey-chip\"]') is visible",
+              "page.evaluate(() => localStorage.getItem('notestr-nip46-payload')) is not null"
+            ]
+          },
+          {
+            "name": "session-restore-after-reload",
+            "description": "After authenticating, page.reload() still shows pubkey chip via restoreNip46Session().",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Complete bunker auth flow (auth helper)",
+              "Call page.reload()",
+              "Wait for hydration"
+            ],
+            "assertions": [
+              "page.locator('[data-testid=\"pubkey-chip\"]') is visible after reload"
+            ]
+          },
+          {
+            "name": "disconnect-clears-session",
+            "description": "Clicking disconnect removes pubkey chip and clears localStorage.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Complete bunker auth flow (auth helper)",
+              "Click disconnect button/action",
+              "Observe UI state"
+            ],
+            "assertions": [
+              "page.locator('[data-testid=\"pubkey-chip\"]') is not visible",
+              "Sign-in UI element is visible",
+              "page.evaluate(() => localStorage.getItem('notestr-nip46-payload')) is null"
+            ]
+          }
+        ],
+        "playwright_file": "e2e/tests/auth.spec.ts"
+      },
+      "status": "pending",
+      "notes": "Requires Story 03 (playwright.config.ts and globalSetup) to be complete before this story can be verified. The auth helper (a shared function calling the bunker flow) should be extracted to e2e/fixtures/ if used in Story 05 as well."
+    },
+
+    {
+      "id": "05",
+      "name": "groups-and-tasks-e2e-tests",
+      "title": "Write groups.spec.ts and tasks.spec.ts for group/task creation flows",
+      "description": "Write e2e/tests/groups.spec.ts: use an auth helper to pre-authenticate via bunker before each test, then create a group with a known name and assert the name appears in the sidebar list. Write e2e/tests/tasks.spec.ts: pre-authenticate and select a group, create a task with a known title, and assert the task card appears in the 'To Do' column. Both spec files clear localStorage between tests.",
+      "acceptance_criteria": ["AC-003", "AC-004"],
+      "scope": {
+        "includes": [
+          "e2e/tests/groups.spec.ts: beforeEach auth via bunker helper, create group named 'E2E Test Group', assert sidebar shows 'E2E Test Group'",
+          "e2e/tests/tasks.spec.ts: beforeEach auth + group selection, create task titled 'E2E Task', assert card in 'To Do' column",
+          "Shared auth helper (e2e/fixtures/auth-helper.ts or inline) that performs bunker auth flow",
+          "localStorage.clear() and IndexedDB clear between tests to avoid MLS state bleed"
+        ],
+        "excludes": [
+          "Drag-and-drop to 'In Progress' column (optional enhancement, out of scope for initial infrastructure)",
+          "Group invitation with second user (ndkClient fixture available but not required for initial stories)",
+          "Task deletion or editing flows"
+        ]
+      },
+      "complexity": "medium",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "group-creation-appears-in-sidebar",
+            "description": "Authenticated user creates a group and sees it in the sidebar.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Pre-authenticate via auth helper (bunker flow)",
+              "Click 'Create group' button",
+              "Enter group name 'E2E Test Group'",
+              "Confirm creation"
+            ],
+            "assertions": [
+              "page.locator('text=E2E Test Group') is visible within the sidebar element"
+            ]
+          },
+          {
+            "name": "task-creation-appears-in-todo-column",
+            "description": "Authenticated user creates a task in a group and sees it in 'To Do'.",
+            "docker_services": ["relay"],
+            "user_steps": [
+              "Pre-authenticate via auth helper (bunker flow)",
+              "Select group 'E2E Test Group' from sidebar",
+              "Click 'Create task' or equivalent button",
+              "Enter task title 'E2E Task'",
+              "Confirm creation"
+            ],
+            "assertions": [
+              "page.locator('[data-column=\"todo\"]').locator('text=E2E Task') is visible"
+            ]
+          }
+        ],
+        "playwright_file": "e2e/tests/groups.spec.ts,e2e/tests/tasks.spec.ts"
+      },
+      "status": "pending",
+      "notes": "Requires Story 03 and Story 04 to be complete. The auth helper from Story 04 should be reused here. IndexedDB holds MLS group state (marmot-ts uses idb-keyval) so tests should call page.evaluate(() => indexedDB.deleteDatabase('...')) in teardown to prevent cross-test MLS state bleed. The exact IndexedDB database name must be confirmed by inspecting the marmot-ts/idb-keyval usage in src/marmot/client.tsx."
+    }
+  ],
+
+  "story_order": ["01", "02", "03", "04", "05"],
+
+  "seams": [
+    {
+      "data": "E2E_BUNKER_URL constant",
+      "source": { "story": "02", "artifact": "e2e/fixtures/bunker.mjs E2E_BUNKER_URL export" },
+      "intermediaries": [
+        { "story": "03", "artifact": "playwright.config.ts env / globalSetup imports E2E_BUNKER_URL" }
+      ],
+      "destination": { "story": "04", "artifact": "auth.spec.ts pastes E2E_BUNKER_URL into the bunker input" }
+    },
+    {
+      "data": "bunker child process lifecycle",
+      "source": { "story": "02", "artifact": "e2e/fixtures/bunker.mjs (standalone runnable)" },
+      "intermediaries": [
+        { "story": "03", "artifact": "e2e/global-setup.ts spawns bunker.mjs as child process, waits for ready log" }
+      ],
+      "destination": { "story": "04", "artifact": "auth.spec.ts relies on running bunker for NIP-46 handshake" }
+    },
+    {
+      "data": "relay Docker service",
+      "source": { "story": "01", "artifact": "docker-compose.e2e.yml relay service" },
+      "intermediaries": [
+        { "story": "03", "artifact": "Makefile e2e target runs make e2e-up before npx playwright test" }
+      ],
+      "destination": { "story": "04", "artifact": "auth.spec.ts NIP-46 handshake uses ws://localhost:7777" }
+    },
+    {
+      "data": "authentication state (pubkey + localStorage session)",
+      "source": { "story": "04", "artifact": "auth.spec.ts bunker auth flow (shared auth helper)" },
+      "intermediaries": [],
+      "destination": { "story": "05", "artifact": "groups.spec.ts and tasks.spec.ts beforeEach auth helper" }
+    }
+  ],
+
+  "dependency_notes": "Stories 01 and 02 are independent of each other and can be implemented in parallel. Story 03 depends on 01 and 02 being present (it wires them together via globalSetup and make targets), but can be developed with stubs if needed. Stories 04 and 05 require Story 03 to be complete for verification, but their spec files can be written independently. Story 05 reuses the auth helper introduced in Story 04.",
+
+  "mock_resolution_plan": "No temporary mocks are needed. All cross-story dependencies use permanent test fixtures (NDK headless client) or direct imports (E2E_BUNKER_URL constant). The relay and bunker are real implementations, not mocks."
+}
