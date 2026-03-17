@@ -1,15 +1,36 @@
 import { useEffect, useRef } from "react";
 
 import {
+  getGroupMembers,
   InviteReader,
   isAdmin,
   type MarmotClient,
+  type MarmotGroup,
   type Unsubscribable,
+  getKeyPackageNostrPubkey,
 } from "@internet-privacy/marmot-ts";
 import type { NostrEvent } from "applesauce-core/helpers/event";
 import type { EventSigner } from "applesauce-core";
 
-import { createInviteStore } from "./storage";
+import {
+  addSyncedGroupEventIds,
+  createInviteStore,
+  getSyncedGroupEventIds,
+} from "./storage";
+
+function mergeIds(existing: Set<string>, incoming: Iterable<string>): string[] {
+  for (const id of incoming) {
+    existing.add(id);
+  }
+
+  return Array.from(existing);
+}
+
+function groupHasMember(group: MarmotGroup, pubkey: string): boolean {
+  return getGroupMembers(group.state).some(
+    (memberPubkey) => memberPubkey === pubkey,
+  );
+}
 
 /**
  * Background hook that handles two complementary device-sync flows:
@@ -99,6 +120,91 @@ export function useDeviceSync(
       subs.push(welcomeSub);
     };
 
+    // ── Effect 1.5: Sync group traffic ──────────────────────────────
+    const groupSubs = new Map<string, Unsubscribable>();
+    const syncedEventIds = new Map<string, Set<string>>();
+
+    const ingestGroupEvents = async (
+      group: MarmotGroup,
+      events: NostrEvent[],
+    ): Promise<void> => {
+      const seen =
+        syncedEventIds.get(group.idStr) ??
+        new Set(await getSyncedGroupEventIds(group.idStr));
+      syncedEventIds.set(group.idStr, seen);
+
+      const pending = events.filter((event) => !seen.has(event.id));
+      if (pending.length === 0) return;
+
+      const processed = new Set<string>();
+
+      for await (const result of group.ingest(pending)) {
+        if (result.kind === "processed" || result.kind === "skipped") {
+          processed.add(result.event.id);
+          continue;
+        }
+
+        if (result.kind === "rejected") {
+          processed.add(result.event.id);
+        }
+      }
+
+      if (processed.size === 0) return;
+
+      syncedEventIds.set(group.idStr, new Set(mergeIds(seen, processed)));
+      await addSyncedGroupEventIds(group.idStr, processed);
+    };
+
+    const syncGroup = async (group: MarmotGroup): Promise<void> => {
+      if (!mountedRef.current || groupSubs.has(group.idStr)) return;
+
+      const relaysForGroup = group.relays ?? relays;
+      const filter = { kinds: [445], "#h": [group.idStr] };
+
+      try {
+        const initialEvents = await client.network.request(relaysForGroup, [filter]);
+        if (!mountedRef.current) return;
+        await ingestGroupEvents(group, initialEvents);
+      } catch (err) {
+        console.debug(`[device-sync] initial group sync failed for ${group.idStr}:`, err);
+      }
+
+      if (!mountedRef.current) return;
+
+      const groupSub = client.network
+        .subscription(relaysForGroup, [filter])
+        .subscribe({
+          next: async (event: NostrEvent) => {
+            try {
+              await ingestGroupEvents(group, [event]);
+            } catch (err) {
+              console.debug(
+                `[device-sync] live group sync failed for ${group.idStr}:`,
+                err,
+              );
+            }
+          },
+        });
+
+      groupSubs.set(group.idStr, groupSub);
+      subs.push(groupSub);
+    };
+
+    const refreshGroupSync = async () => {
+      const activeGroupIds = new Set(client.groups.map((group) => group.idStr));
+
+      for (const [groupId, sub] of groupSubs) {
+        if (activeGroupIds.has(groupId)) continue;
+        sub.unsubscribe();
+        groupSubs.delete(groupId);
+        syncedEventIds.delete(groupId);
+      }
+
+      for (const group of client.groups) {
+        await syncGroup(group);
+      }
+    };
+
     // ── Effect 2: Auto-invite new devices ───────────────────────────
     const runKeyPackageSync = async () => {
       // Build set of local KP published event IDs
@@ -110,10 +216,18 @@ export function useDeviceSync(
       const invited = new Set<string>(); // "groupId:kpEventId"
 
       const inviteToAllGroups = async (kpEvent: NostrEvent) => {
+        const inviteePubkey = getKeyPackageNostrPubkey(kpEvent);
+
         for (const group of client.groups) {
           if (!mountedRef.current) return;
           const gd = group.groupData;
           if (!gd || !isAdmin(gd, pubkey)) continue;
+          if (groupHasMember(group, inviteePubkey)) {
+            console.debug(
+              `[device-sync] skipping auto-invite for ${group.idStr}: ${inviteePubkey} is already a member`,
+            );
+            continue;
+          }
 
           const key = `${group.idStr}:${kpEvent.id}`;
           if (invited.has(key)) continue;
@@ -150,10 +264,20 @@ export function useDeviceSync(
 
     // Launch both flows
     runWelcomeSync();
+    refreshGroupSync();
     runKeyPackageSync();
+
+    const handleGroupsUpdated = () => {
+      refreshGroupSync().catch((err) => {
+        console.debug("[device-sync] group sync refresh failed:", err);
+      });
+    };
+
+    client.on("groupsUpdated", handleGroupsUpdated);
 
     return () => {
       mountedRef.current = false;
+      client.off("groupsUpdated", handleGroupsUpdated);
       for (const sub of subs) {
         sub.unsubscribe();
       }

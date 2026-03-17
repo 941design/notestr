@@ -60,6 +60,25 @@ export function createInviteStore(): import("@internet-privacy/marmot-ts").Invit
   };
 }
 
+const groupSyncStore = createKVStore<string[]>("group-sync");
+
+export async function getSyncedGroupEventIds(groupId: string): Promise<string[]> {
+  return (await groupSyncStore.getItem(groupId)) ?? [];
+}
+
+export async function addSyncedGroupEventIds(
+  groupId: string,
+  eventIds: Iterable<string>,
+): Promise<void> {
+  const merged = new Set(await getSyncedGroupEventIds(groupId));
+
+  for (const eventId of eventIds) {
+    merged.add(eventId);
+  }
+
+  await groupSyncStore.setItem(groupId, Array.from(merged));
+}
+
 export function createInMemoryKVStore<T>(): KeyValueStoreBackend<T> {
   const data = new Map<string, T>();
 
