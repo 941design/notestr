@@ -17,12 +17,15 @@ describe("getPwaConfig", () => {
     expect(config.dest).toBe("public");
   });
 
-  it("sets scope with basePath in production", () => {
+  it("sets scope from NEXT_PUBLIC_BASE_PATH", () => {
+    process.env.NEXT_PUBLIC_BASE_PATH = "/notestr";
     const config = getPwaConfig("production");
     expect(config.scope).toBe("/notestr/");
+    delete process.env.NEXT_PUBLIC_BASE_PATH;
   });
 
-  it("sets scope to / in development", () => {
+  it("sets scope to / when NEXT_PUBLIC_BASE_PATH is unset", () => {
+    delete process.env.NEXT_PUBLIC_BASE_PATH;
     const config = getPwaConfig("development");
     expect(config.scope).toBe("/");
   });

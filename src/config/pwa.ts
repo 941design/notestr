@@ -6,15 +6,14 @@
  * in the service worker context.
  */
 export function getPwaConfig(nodeEnv: string) {
-  const isProduction = nodeEnv === "production";
-  const basePath = isProduction ? "/notestr" : "";
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
   return {
     dest: "public" as const,
     register: true,
     scope: `${basePath}/`,
     sw: "sw.js",
-    disable: !isProduction,
+    disable: nodeEnv !== "production",
     workboxOptions: {
       runtimeCaching: [
         {

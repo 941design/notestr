@@ -13,7 +13,7 @@ FTP_USER := $(HOSTEUROPE_FTP_USER)
 FTP_PASS := $(HOSTEUROPE_FTP_PASS)
 
 # Remote path (hosteurope)
-REMOTE_ROOT := /notestr
+REMOTE_ROOT := /
 
 # Local paths
 LOCAL_DIST := out
