@@ -1,38 +1,27 @@
 import React from "react";
-import type { EventSigner } from "applesauce-core";
 import { shortenPubkey, hexToNpub } from "../lib/nostr";
 
 interface ConnectionStatusProps {
-  signer: EventSigner | null;
   pubkey: string | null;
-  onConnect: () => void;
+  authMethod: "nip07" | "nip46" | null;
+  onDisconnect: () => void;
 }
 
 export function ConnectionStatus({
-  signer,
   pubkey,
-  onConnect,
+  authMethod,
+  onDisconnect,
 }: ConnectionStatusProps) {
-  if (!signer) {
+  if (!pubkey) {
     return (
       <div className="connection-status disconnected">
         <span className="status-dot red" />
-        <span className="status-text">No NIP-07 extension detected</span>
+        <span className="status-text">Not connected</span>
       </div>
     );
   }
 
-  if (!pubkey) {
-    return (
-      <div className="connection-status">
-        <span className="status-dot yellow" />
-        <span className="status-text">Extension found</span>
-        <button className="btn btn-primary btn-sm" onClick={onConnect}>
-          Connect
-        </button>
-      </div>
-    );
-  }
+  const label = authMethod === "nip46" ? "bunker" : "NIP-07";
 
   return (
     <div className="connection-status connected">
@@ -40,6 +29,10 @@ export function ConnectionStatus({
       <span className="status-text" title={hexToNpub(pubkey)}>
         {shortenPubkey(pubkey)}
       </span>
+      <span className="auth-badge">{label}</span>
+      <button className="btn btn-outline btn-sm" onClick={onDisconnect}>
+        Disconnect
+      </button>
     </div>
   );
 }
