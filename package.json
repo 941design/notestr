@@ -18,11 +18,13 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@hpke/chacha20poly1305": "^1.7.1",
     "@internet-privacy/marmot-ts": "^0.4.0",
     "@nostr-dev-kit/ndk": "^3.0.3",
     "idb-keyval": "^6.2.2",
     "next": "^15.3.4",
     "nostr-tools": "^2.23.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "uuid": "^13.0.0"

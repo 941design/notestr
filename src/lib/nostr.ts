@@ -130,6 +130,47 @@ export function hasNip46Session(): boolean {
   return !!localStorage.getItem(NIP46_PAYLOAD);
 }
 
+/**
+ * Start a nostrconnect:// flow (app-initiated, for Amber and QR-capable signers).
+ * Returns the URI immediately for display as a QR code / deep link,
+ * plus a promise that resolves once the signer connects.
+ */
+export function startNostrConnect(
+  relay: string,
+  relays: string[],
+): { uri: string; connection: Promise<Nip46Connection>; cancel: () => void } {
+  const ndk = new NDK({ explicitRelayUrls: relays });
+  const savedKey = localStorage.getItem(NIP46_LOCAL_KEY) ?? undefined;
+  const signer = NDKNip46Signer.nostrconnect(ndk, relay, savedKey, {
+    name: "notestr",
+    perms: "sign_event:31337,nip44_encrypt,nip44_decrypt",
+  });
+  const uri = signer.nostrConnectUri!;
+
+  let cancelled = false;
+  const cancel = () => {
+    cancelled = true;
+  };
+
+  const connection = (async (): Promise<Nip46Connection> => {
+    await ndk.connect();
+    await signer.blockUntilReady();
+    if (cancelled) throw new Error("Cancelled");
+
+    localStorage.setItem(NIP46_LOCAL_KEY, signer.localSigner.privateKey!);
+    localStorage.setItem(NIP46_PAYLOAD, signer.toPayload());
+
+    const pubkey = await signer.getPublicKey();
+    return {
+      signer: bridgeNip46ToEventSigner(signer),
+      pubkey,
+      nip46Signer: signer,
+    };
+  })();
+
+  return { uri, connection, cancel };
+}
+
 export function npubToHex(npub: string): string {
   const { type, data } = decode(npub);
   if (type !== "npub") throw new Error(`Expected npub, got ${type}`);

@@ -44,10 +44,10 @@ build: node_modules ## Build for production
 	npx next build
 	@echo "Static files available in $(LOCAL_DIST)/"
 
-test: node_modules ## Run tests (Vitest)
+test: build ## Run tests (Vitest)
 	npx vitest run
 
-dev: node_modules ## Start development server
+dev: node_modules clean ## Start development server
 	npx next dev --port 3000 --hostname 0.0.0.0
 
 relay-up: ## Start local strfry relay (Docker)
@@ -58,6 +58,7 @@ relay-down: ## Stop local strfry relay
 
 clean: ## Remove build artifacts
 	rm -rf out .next
+	rm -f public/sw.js public/workbox-*.js
 
 # =============================================================================
 # Production Deployment (FTP to hosteurope)
@@ -73,7 +74,7 @@ deploy-check: ## Verify deployment prerequisites
 	@if ! command -v lftp >/dev/null 2>&1; then echo "ERROR: lftp not installed. Run: brew install lftp"; exit 1; fi
 	@echo "All prerequisites satisfied."
 
-deploy: deploy-check ## Deploy to production (FTP)
+deploy: build deploy-check ## Deploy to production (FTP)
 	@echo "Deploying to $(FTP_HOST)$(REMOTE_ROOT)..."
 	@lftp -u "$(FTP_USER),$(FTP_PASS)" "$(FTP_HOST)" -e "\
 		set ssl:verify-certificate no; \

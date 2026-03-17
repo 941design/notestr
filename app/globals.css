@@ -555,6 +555,62 @@ body {
   min-width: 0;
 }
 
+/* ===== Login Tabs ===== */
+.login-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.login-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.login-tab:hover {
+  color: var(--text);
+}
+
+.login-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.login-tab-content {
+  padding-top: 4px;
+}
+
+.nostrconnect-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.nostrconnect-qr svg {
+  border-radius: var(--radius);
+}
+
+.nostrconnect-waiting {
+  font-size: 0.8rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* ===== Auth Badge ===== */
 .auth-badge {
   font-size: 0.7rem;

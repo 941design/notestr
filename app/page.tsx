@@ -7,7 +7,9 @@ import {
   restoreNip46Session,
   clearNip46Session,
   hasNip46Session,
+  startNostrConnect,
 } from "../src/lib/nostr";
+import { QRCodeSVG } from "qrcode.react";
 import { MarmotProvider } from "../src/marmot/client";
 import { TaskStoreProvider } from "../src/store/task-store";
 import { ConnectionStatus } from "../src/components/ConnectionStatus";
@@ -16,8 +18,11 @@ import { Board } from "../src/components/Board";
 import type { EventSigner } from "applesauce-core";
 
 const DEFAULT_RELAYS = ["ws://localhost:7777"];
+// Amber can't reach localhost — nostrconnect flow needs a public relay
+const NOSTRCONNECT_RELAY = "wss://relay.damus.io";
 
 type AuthMethod = "nip07" | "nip46" | null;
+type LoginTab = "amber" | "bunker";
 
 export default function Page() {
   const [signer, setSigner] = useState<EventSigner | null>(null);
@@ -26,10 +31,22 @@ export default function Page() {
   const [signerChecked, setSignerChecked] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>(null);
 
+  // Login tab
+  const [loginTab, setLoginTab] = useState<LoginTab>("amber");
+
   // Bunker login state
   const [bunkerUrl, setBunkerUrl] = useState("");
   const [bunkerConnecting, setBunkerConnecting] = useState(false);
   const [bunkerError, setBunkerError] = useState<string | null>(null);
+
+  // Nostrconnect (Amber) state
+  const [nostrConnectUri, setNostrConnectUri] = useState<string | null>(null);
+  const [nostrConnectCancel, setNostrConnectCancel] = useState<
+    (() => void) | null
+  >(null);
+  const [nostrConnectError, setNostrConnectError] = useState<string | null>(
+    null,
+  );
 
   // On mount: try restoring NIP-46 session, then check NIP-07
   useEffect(() => {
@@ -99,6 +116,40 @@ export default function Page() {
     }
   }, [bunkerUrl]);
 
+  const handleNostrConnect = useCallback(() => {
+    setNostrConnectError(null);
+    const { uri, connection, cancel } = startNostrConnect(
+      NOSTRCONNECT_RELAY,
+      [...DEFAULT_RELAYS, NOSTRCONNECT_RELAY],
+    );
+    setNostrConnectUri(uri);
+    setNostrConnectCancel(() => cancel);
+
+    connection
+      .then((conn) => {
+        setSigner(conn.signer);
+        setPubkey(conn.pubkey);
+        setAuthMethod("nip46");
+        setNostrConnectUri(null);
+        setNostrConnectCancel(null);
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.message === "Cancelled") return;
+        setNostrConnectError(
+          err instanceof Error ? err.message : "Connection failed",
+        );
+        setNostrConnectUri(null);
+        setNostrConnectCancel(null);
+      });
+  }, []);
+
+  const handleNostrConnectCancel = useCallback(() => {
+    nostrConnectCancel?.();
+    setNostrConnectUri(null);
+    setNostrConnectCancel(null);
+    setNostrConnectError(null);
+  }, [nostrConnectCancel]);
+
   const handleDisconnect = useCallback(() => {
     if (authMethod === "nip46") {
       clearNip46Session();
@@ -144,35 +195,106 @@ export default function Page() {
                   )}
                 </div>
 
-                {/* NIP-46 bunker option */}
+                {/* NIP-46 remote signer options */}
                 <div className="login-section">
                   <h3 className="login-section-title">Remote Signer</h3>
-                  <p className="text-muted login-hint">
-                    Paste a bunker:// URL from Amber, nsec.app, or another
-                    NIP-46 signer
-                  </p>
-                  <div className="bunker-form">
-                    <input
-                      className="input"
-                      type="text"
-                      placeholder="bunker://..."
-                      value={bunkerUrl}
-                      onChange={(e) => setBunkerUrl(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && handleBunkerConnect()
-                      }
-                      disabled={bunkerConnecting}
-                    />
+
+                  <div className="login-tabs">
                     <button
-                      className="btn btn-primary"
-                      onClick={handleBunkerConnect}
-                      disabled={bunkerConnecting || !bunkerUrl.trim()}
+                      className={`login-tab ${loginTab === "amber" ? "active" : ""}`}
+                      onClick={() => setLoginTab("amber")}
                     >
-                      {bunkerConnecting ? "Connecting..." : "Connect"}
+                      Amber / QR Code
+                    </button>
+                    <button
+                      className={`login-tab ${loginTab === "bunker" ? "active" : ""}`}
+                      onClick={() => setLoginTab("bunker")}
+                    >
+                      Paste bunker:// URL
                     </button>
                   </div>
-                  {bunkerError && (
-                    <p className="error-text">{bunkerError}</p>
+
+                  {loginTab === "amber" && (
+                    <div className="login-tab-content">
+                      {!nostrConnectUri ? (
+                        <>
+                          <p className="text-muted login-hint">
+                            Scan a QR code with Amber or another NIP-46 signer
+                          </p>
+                          <button
+                            className="btn btn-primary login-btn"
+                            onClick={handleNostrConnect}
+                          >
+                            Show QR Code
+                          </button>
+                          {nostrConnectError && (
+                            <p className="error-text">{nostrConnectError}</p>
+                          )}
+                        </>
+                      ) : (
+                        <div className="nostrconnect-qr">
+                          <QRCodeSVG
+                            value={nostrConnectUri}
+                            size={200}
+                            bgColor="transparent"
+                            fgColor="currentColor"
+                          />
+                          {/Android/i.test(
+                            typeof navigator !== "undefined"
+                              ? navigator.userAgent
+                              : "",
+                          ) && (
+                            <a
+                              href={nostrConnectUri}
+                              className="btn btn-primary login-btn"
+                            >
+                              Open in Amber
+                            </a>
+                          )}
+                          <p className="text-muted nostrconnect-waiting">
+                            Waiting for signer to connect...
+                          </p>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={handleNostrConnectCancel}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {loginTab === "bunker" && (
+                    <div className="login-tab-content">
+                      <p className="text-muted login-hint">
+                        Paste a bunker:// URL from nsec.app or another NIP-46
+                        signer
+                      </p>
+                      <div className="bunker-form">
+                        <input
+                          className="input"
+                          type="text"
+                          placeholder="bunker://..."
+                          value={bunkerUrl}
+                          onChange={(e) => setBunkerUrl(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleBunkerConnect()
+                          }
+                          disabled={bunkerConnecting}
+                        />
+                        <button
+                          className="btn btn-primary"
+                          onClick={handleBunkerConnect}
+                          disabled={bunkerConnecting || !bunkerUrl.trim()}
+                        >
+                          {bunkerConnecting ? "Connecting..." : "Connect"}
+                        </button>
+                      </div>
+                      {bunkerError && (
+                        <p className="error-text">{bunkerError}</p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
