@@ -6,10 +6,25 @@ import { NDK_CONNECT_TIMEOUT_MS } from "@/config/relays";
 
 const NIP46_LOCAL_KEY = "notestr-nip46-local-key";
 const NIP46_PAYLOAD = "notestr-nip46-payload";
+const AUTH_METHOD_KEY = "notestr-auth-method";
 
 export function getNip07Signer(): EventSigner | null {
   if (!window.nostr) return null;
   return window.nostr as unknown as EventSigner;
+}
+
+export function setSavedAuthMethod(method: "nip07" | "nip46" | null): void {
+  if (method) {
+    localStorage.setItem(AUTH_METHOD_KEY, method);
+    return;
+  }
+
+  localStorage.removeItem(AUTH_METHOD_KEY);
+}
+
+export function getSavedAuthMethod(): "nip07" | "nip46" | null {
+  const value = localStorage.getItem(AUTH_METHOD_KEY);
+  return value === "nip07" || value === "nip46" ? value : null;
 }
 
 /**
@@ -81,6 +96,7 @@ export async function connectBunker(
   // Persist session
   localStorage.setItem(NIP46_LOCAL_KEY, nip46.localSigner.privateKey!);
   localStorage.setItem(NIP46_PAYLOAD, nip46.toPayload());
+  setSavedAuthMethod("nip46");
 
   const pubkey = await nip46.getPublicKey();
   return {
@@ -108,6 +124,7 @@ export async function restoreNip46Session(
 
     // Re-persist in case payload changed
     localStorage.setItem(NIP46_PAYLOAD, nip46.toPayload());
+    setSavedAuthMethod("nip46");
 
     const pubkey = await nip46.getPublicKey();
     return {
@@ -125,6 +142,9 @@ export async function restoreNip46Session(
 export function clearNip46Session(): void {
   localStorage.removeItem(NIP46_LOCAL_KEY);
   localStorage.removeItem(NIP46_PAYLOAD);
+  if (getSavedAuthMethod() === "nip46") {
+    setSavedAuthMethod(null);
+  }
 }
 
 export function hasNip46Session(): boolean {
@@ -160,6 +180,7 @@ export function startNostrConnect(
 
     localStorage.setItem(NIP46_LOCAL_KEY, signer.localSigner.privateKey!);
     localStorage.setItem(NIP46_PAYLOAD, signer.toPayload());
+    setSavedAuthMethod("nip46");
 
     const pubkey = await signer.getPublicKey();
     return {

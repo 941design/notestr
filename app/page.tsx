@@ -9,6 +9,8 @@ import {
   clearNip46Session,
   hasNip46Session,
   startNostrConnect,
+  getSavedAuthMethod,
+  setSavedAuthMethod,
 } from "@/lib/nostr";
 import { QRCodeSVG } from "qrcode.react";
 import { MarmotProvider } from "@/marmot/client";
@@ -73,9 +75,26 @@ export default function Page() {
         }
       }
 
+      const s = getNip07Signer();
+      const savedAuthMethod = getSavedAuthMethod();
+
+      if (s && savedAuthMethod === "nip07") {
+        try {
+          const pk = await s.getPublicKey();
+          if (!cancelled) {
+            setSigner(s);
+            setPubkey(pk);
+            setAuthMethod("nip07");
+            setSignerChecked(true);
+            return;
+          }
+        } catch {
+          setSavedAuthMethod(null);
+        }
+      }
+
       await new Promise((r) => setTimeout(r, 300));
       if (!cancelled) {
-        const s = getNip07Signer();
         if (s) setSigner(s);
         setSignerChecked(true);
       }
@@ -95,10 +114,11 @@ export default function Page() {
     const s = getNip07Signer();
     if (!s) return;
     setSigner(s);
-    setAuthMethod("nip07");
     try {
       const pk = await s.getPublicKey();
       setPubkey(pk);
+      setAuthMethod("nip07");
+      setSavedAuthMethod("nip07");
     } catch (err) {
       console.error("Failed to get public key:", err);
     }
@@ -160,6 +180,9 @@ export default function Page() {
   const handleDisconnect = useCallback(() => {
     if (authMethod === "nip46") {
       clearNip46Session();
+    }
+    if (authMethod === "nip07") {
+      setSavedAuthMethod(null);
     }
     setSigner(null);
     setPubkey(null);
