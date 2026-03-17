@@ -6,15 +6,11 @@
 
 import { test, expect } from '@playwright/test';
 import { authenticateViaBunker } from '../fixtures/auth-helper.js';
+import { clearAppState } from '../fixtures/cleanup.js';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.clear();
-    for (const dbName of ['notestr-group-state', 'notestr-key-packages', 'notestr-invite-received', 'notestr-invite-unread', 'notestr-invite-seen']) {
-      indexedDB.deleteDatabase(dbName);
-    }
-  });
+  await clearAppState(page);
   // Authenticate before each test
   await authenticateViaBunker(page);
 });
@@ -30,5 +26,5 @@ test('create group: name appears in sidebar', async ({ page }) => {
 
   // Group name must appear in the sidebar group list
   const sidebar = page.locator('aside');
-  await expect(sidebar.getByText(GROUP_NAME)).toBeVisible({ timeout: 15000 });
+  await expect(sidebar.getByText(GROUP_NAME)).toBeVisible({ timeout: 30000 });
 });

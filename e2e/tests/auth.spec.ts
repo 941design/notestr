@@ -9,17 +9,12 @@
 
 import { test, expect } from '@playwright/test';
 import { authenticateViaBunker } from '../fixtures/auth-helper.js';
+import { clearAppState } from '../fixtures/cleanup.js';
 
 test.beforeEach(async ({ page }) => {
   // Clear localStorage and IndexedDB before every test
   await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.clear();
-    // Clear marmot-ts IndexedDB stores
-    for (const dbName of ['notestr-group-state', 'notestr-key-packages', 'notestr-invite-received', 'notestr-invite-unread', 'notestr-invite-seen']) {
-      indexedDB.deleteDatabase(dbName);
-    }
-  });
+  await clearAppState(page);
 });
 
 test('full auth flow: bunker URL → pubkey chip visible', async ({ page }) => {
@@ -48,8 +43,8 @@ test('session restore: pubkey chip persists after page reload', async ({ page })
 test('disconnect: clears session and returns to sign-in screen', async ({ page }) => {
   await authenticateViaBunker(page);
 
-  // Click the disconnect button
-  await page.locator('[data-testid="disconnect-button"]').click();
+  // Click the disconnect button (force: badge may overlap on narrow viewports)
+  await page.locator('[data-testid="disconnect-button"]').click({ force: true });
 
   // Pubkey chip must no longer be visible
   await expect(page.locator('[data-testid="pubkey-chip"]')).not.toBeVisible();

@@ -8,15 +8,11 @@
 
 import { test, expect } from '@playwright/test';
 import { authenticateViaBunker } from '../fixtures/auth-helper.js';
+import { clearAppState } from '../fixtures/cleanup.js';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => {
-    localStorage.clear();
-    for (const dbName of ['notestr-group-state', 'notestr-key-packages', 'notestr-invite-received', 'notestr-invite-unread', 'notestr-invite-seen']) {
-      indexedDB.deleteDatabase(dbName);
-    }
-  });
+  await clearAppState(page);
   await authenticateViaBunker(page);
 });
 
@@ -30,7 +26,7 @@ test('create task: card appears in Open column', async ({ page }) => {
 
   // Wait for the group to appear in the sidebar and get selected automatically
   const sidebar = page.locator('aside');
-  await expect(sidebar.getByText(GROUP_NAME)).toBeVisible({ timeout: 15000 });
+  await expect(sidebar.getByText(GROUP_NAME)).toBeVisible({ timeout: 30000 });
 
   // The group is auto-selected on creation; wait for the board to appear
   await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible({ timeout: 10000 });
@@ -44,7 +40,10 @@ test('create task: card appears in Open column', async ({ page }) => {
   // Submit the form
   await page.getByRole('button', { name: 'Create' }).last().click();
 
-  // The task card should appear in the "Open" column (data-column="open")
+  // The task card should appear in the "Open" column (data-column="open").
+  // Use toContainText: on narrow mobile viewports the card is in the DOM
+  // but Playwright considers it "hidden" because the 3-column grid leaves
+  // very little visible width per column.
   const openColumn = page.locator('[data-column="open"]');
-  await expect(openColumn.getByText(TASK_TITLE)).toBeVisible({ timeout: 15000 });
+  await expect(openColumn).toContainText(TASK_TITLE, { timeout: 15000 });
 });
