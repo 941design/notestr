@@ -47,7 +47,7 @@ build: node_modules ## Build for production
 test: build ## Run tests (Vitest)
 	npx vitest run
 
-dev: node_modules clean ## Start development server
+dev: node_modules relay-up clean ## Start development server
 	npx next dev --port 3000 --hostname 0.0.0.0
 
 relay-up: ## Start local strfry relay (Docker)
