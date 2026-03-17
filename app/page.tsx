@@ -13,6 +13,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { MarmotProvider } from "../src/marmot/client";
 import { TaskStoreProvider } from "../src/store/task-store";
 import { ConnectionStatus } from "../src/components/ConnectionStatus";
+import { ThemeToggle } from "../src/components/ThemeToggle";
 import { GroupManager } from "../src/components/GroupManager";
 import { Board } from "../src/components/Board";
 import type { EventSigner } from "applesauce-core";
@@ -166,6 +167,7 @@ export default function Page() {
       <div className="app">
         <header className="topbar">
           <h1 className="app-title">notestr</h1>
+          <ThemeToggle />
         </header>
         <main className="main-area">
           <div className="placeholder">
@@ -311,11 +313,14 @@ export default function Page() {
       <div className="app">
         <header className="topbar">
           <h1 className="app-title">notestr</h1>
-          <ConnectionStatus
+          <div className="topbar-actions">
+            <ThemeToggle />
+            <ConnectionStatus
             pubkey={pubkey}
             authMethod={authMethod}
             onDisconnect={handleDisconnect}
           />
+          </div>
         </header>
         <div className="app-body">
           <aside className="sidebar">
