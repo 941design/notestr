@@ -31,6 +31,13 @@ export class NdkNetworkAdapter implements NostrNetworkInterface {
    *
    * Creates an NDKEvent from the raw event, builds a relay set from the
    * given URLs, and publishes through NDK. Returns a per-relay result map.
+   *
+   * The publish MUST be awaited — marmot-ts checks the response via hasAck()
+   * and only advances local MLS state (merge pending commit) when at least
+   * one relay confirms with a NIP-20 OK. Fire-and-forget would break the
+   * publish-then-merge invariant: local epoch advances but the commit never
+   * reaches the relay, leaving other group members stuck on the old epoch.
+   * MDK (Rust) and WhiteNoise enforce the same ordering.
    */
   async publish(
     relays: string[],
@@ -42,7 +49,9 @@ export class NdkNetworkAdapter implements NostrNetworkInterface {
     const results: Record<string, PublishResponse> = {};
 
     try {
-      const publishedRelays = await ndkEvent.publish(relaySet);
+      // Timeout is required — NDK waits for relay OK indefinitely without one,
+      // which stalls the entire commit/invite flow if a relay is unresponsive.
+      const publishedRelays = await ndkEvent.publish(relaySet, 10_000);
 
       for (const relay of publishedRelays) {
         results[relay.url] = { from: relay.url, ok: true };
