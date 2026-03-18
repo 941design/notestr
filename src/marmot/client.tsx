@@ -31,6 +31,7 @@ interface MarmotContextValue {
   relays: string[];
   loading: boolean;
   error: Error | null;
+  discoverable: boolean;
 }
 
 const MarmotContext = createContext<MarmotContextValue>({
@@ -40,6 +41,7 @@ const MarmotContext = createContext<MarmotContextValue>({
   relays: DEFAULT_RELAYS,
   loading: true,
   error: null,
+  discoverable: false,
 });
 
 interface MarmotProviderProps {
@@ -57,12 +59,13 @@ export function MarmotProvider({
 }: MarmotProviderProps) {
   const relays = relaysProp ?? DEFAULT_RELAYS;
   const [state, setState] = useState<
-    Pick<MarmotContextValue, "client" | "groups" | "loading" | "error">
+    Pick<MarmotContextValue, "client" | "groups" | "loading" | "error" | "discoverable">
   >({
     client: null,
     groups: [],
     loading: true,
     error: null,
+    discoverable: false,
   });
 
   const mountedRef = useRef(true);
@@ -105,7 +108,8 @@ export function MarmotProvider({
 
       if (!mountedRef.current) return;
 
-      setState({ client, groups, loading: false, error: null });
+      // Make client available immediately — key package work runs in background
+      setState({ client, groups, loading: false, error: null, discoverable: false });
 
       client.on("groupsUpdated", (updatedGroups) => {
         if (mountedRef.current) {
@@ -113,25 +117,67 @@ export function MarmotProvider({
         }
       });
 
-      // Publish initial key package if none exist
-      const existingPackages = await client.keyPackages.list();
-      if (existingPackages.length === 0 && relays.length > 0) {
-        await client.keyPackages.create({ relays });
-      }
+      // Rotate consumed key packages after joining a group
+      client.on("groupJoined", async () => {
+        if (!mountedRef.current) return;
+        const packages = await client.keyPackages.list();
+        for (const pkg of packages.filter((p) => p.used)) {
+          await client.keyPackages.rotate(pkg.keyPackageRef, { relays });
+        }
+        // Re-evaluate discoverability
+        const updated = await client.keyPackages.list();
+        const nowDiscoverable = updated.some(
+          (p) => !p.used && p.published && p.published.length > 0,
+        );
+        if (mountedRef.current) {
+          setState((prev) => ({ ...prev, discoverable: nowDiscoverable }));
+        }
+      });
 
-      // Publish kind 10051 relay list so other users can send us Welcomes
-      if (relays.length > 0 && ndk) {
-        const unsigned = createKeyPackageRelayListEvent({
-          pubkey,
-          relays,
-        });
-        const signed = await signer.signEvent(unsigned);
-        const ndkEvent = new NDKEvent(ndk, signed);
-        const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
-        await ndkEvent.publish(relaySet).catch(() => {
-          // Non-fatal: invite flow degrades gracefully
-        });
-      }
+      // --- Background: key package readiness & relay list publish ---
+      (async () => {
+        try {
+          const existingPackages = await client.keyPackages.list();
+          const hasUsable = existingPackages.some(
+            (p) => !p.used && p.published && p.published.length > 0,
+          );
+
+          if (!hasUsable && relays.length > 0) {
+            await client.keyPackages.create({ relays });
+          }
+
+          // Publish kind 10051 relay list only if relay doesn't already have one
+          if (relays.length > 0 && ndk) {
+            const existing10051 = await network.request(relays, [
+              { kinds: [10051 as any], authors: [pubkey], limit: 1 } as any,
+            ]);
+
+            if (existing10051.length === 0) {
+              const unsigned = createKeyPackageRelayListEvent({
+                pubkey,
+                relays,
+              });
+              const signed = await signer.signEvent(unsigned);
+              const ndkEvent = new NDKEvent(ndk, signed);
+              const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
+              await ndkEvent.publish(relaySet).catch(() => {
+                // Non-fatal: invite flow degrades gracefully
+              });
+            }
+          }
+
+          if (!mountedRef.current) return;
+
+          // Re-evaluate after background work completes
+          const updated = await client.keyPackages.list();
+          const nowDiscoverable = updated.some(
+            (p) => !p.used && p.published && p.published.length > 0,
+          );
+          setState((prev) => ({ ...prev, discoverable: nowDiscoverable }));
+        } catch {
+          // Non-fatal: discoverability degrades gracefully
+        }
+      })();
     } catch (err) {
       if (mountedRef.current) {
         setState({
@@ -139,6 +185,7 @@ export function MarmotProvider({
           groups: [],
           loading: false,
           error: err instanceof Error ? err : new Error(String(err)),
+          discoverable: false,
         });
       }
     }

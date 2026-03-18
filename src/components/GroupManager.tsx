@@ -127,7 +127,7 @@ export function GroupManager({
         <Button
           type="submit"
           className="w-full"
-          disabled={creating || !newGroupName.trim()}
+          disabled={loading || creating || !newGroupName.trim()}
         >
           <Plus className="size-4" />
           {creating ? "Creating..." : "Create"}
