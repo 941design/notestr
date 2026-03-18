@@ -17,7 +17,7 @@ export function GroupManager({
   onGroupSelect,
   selectedGroupId,
 }: GroupManagerProps) {
-  const { client, groups, relays, loading, error: marmotError } = useMarmot();
+  const { client, groups, relays, pubkey: selfPubkey, loading, error: marmotError } = useMarmot();
   const [newGroupName, setNewGroupName] = useState("");
   const [inviteNpub, setInviteNpub] = useState("");
   const [creating, setCreating] = useState(false);
@@ -60,7 +60,8 @@ export function GroupManager({
           try {
             const content = JSON.parse(event.content as string);
             const name: string | undefined =
-              content.name || content.displayName;
+              (content.display_name || content.displayName) ||
+              content.name;
             if (name && event.pubkey) {
               profileCacheRef.current.set(event.pubkey as string, name);
             }
@@ -222,6 +223,7 @@ export function GroupManager({
                 title={hexToNpub(hex)}
               >
                 {profileNames.get(hex) ?? shortenPubkey(hex)}
+                {hex === selfPubkey && " (you)"}
               </li>
             ))}
           </ul>
