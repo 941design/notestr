@@ -21,7 +21,13 @@ import {
   getSyncedGroupEventIds,
 } from "./storage";
 import { TASK_EVENT_KIND, type TaskEvent } from "../store/task-events";
-import { appendEvent } from "../store/persistence";
+import { appendEvent, loadEvents } from "../store/persistence";
+import { replayEvents } from "../store/task-reducer";
+
+/** Custom kind for NIP-44 encrypted task snapshots sent outside MLS. */
+export const TASK_SNAPSHOT_KIND = 30078;
+/** Fixed `d` tag for replaceable task snapshot events. */
+const SNAPSHOT_D_TAG = "notestr-task-snapshot";
 
 function mergeIds(existing: Set<string>, incoming: Iterable<string>): string[] {
   for (const id of incoming) {
@@ -66,6 +72,13 @@ export function useDeviceSync(
     mountedRef.current = true;
     const subs: Unsubscribable[] = [];
 
+    // Groups just joined via welcome — need pre-seed + selfUpdate
+    const pendingSelfUpdate = new Set<string>();
+    // Barrier: resolves when the current join + pre-seed completes.
+    // Set BEFORE joinGroupFromWelcome because that call fires the
+    // synchronous "groupsUpdated" event which triggers syncGroup.
+    let joinBarrier: Promise<void> | null = null;
+
     // ── Effect 1: Receive Welcomes ──────────────────────────────────
     const runWelcomeSync = async () => {
       const store = createInviteStore();
@@ -79,21 +92,44 @@ export function useDeviceSync(
         const unread = await inviteReader.getUnread();
         for (const invite of unread) {
           if (!mountedRef.current) return;
+
+          let resolveBarrier!: () => void;
+          joinBarrier = new Promise<void>((r) => { resolveBarrier = r; });
+
           try {
             const { group } = await client.joinGroupFromWelcome({
               welcomeRumor: invite,
             });
+
+            pendingSelfUpdate.add(group.idStr);
             await inviteReader.markAsRead(invite.id);
+
+            // Pre-seed syncedEventIds with all relay events for this group.
+            // The welcome already incorporates group state up to the invite
+            // epoch — re-ingesting those events would cause a double epoch
+            // advance and MLS key divergence.
+            const relaysForGroup = group.relays ?? relays;
+            const hTag = getNostrGroupIdHex(group.state);
             try {
-              await group.selfUpdate();
+              const existing = await client.network.request(relaysForGroup, [
+                { kinds: [445], "#h": [hTag] },
+              ]);
+              const ids = new Set(existing.map((e) => e.id));
+              syncedEventIds.set(group.idStr, ids);
+              await addSyncedGroupEventIds(group.idStr, ids);
             } catch {
-              // selfUpdate may fail if epoch changed; non-fatal
+              // Non-fatal
             }
+
+            // Fetch task snapshot (NIP-44 encrypted, sent by inviter)
+            await fetchTaskSnapshot(group);
           } catch (err) {
-            // "no matching key package" = Welcome for another device → skip
             console.debug("[device-sync] join from welcome failed:", err);
             await inviteReader.markAsRead(invite.id);
           }
+
+          resolveBarrier();
+          joinBarrier = null;
         }
       };
 
@@ -134,6 +170,52 @@ export function useDeviceSync(
     const groupSubs = new Map<string, Unsubscribable>();
     const syncedEventIds = new Map<string, Set<string>>();
 
+    /**
+     * Fetch a NIP-44 encrypted task snapshot from the group admin.
+     * Published as a replaceable event (kind 30078) with `#h` = group ID.
+     */
+    const fetchTaskSnapshot = async (group: MarmotGroup): Promise<void> => {
+      const members = getGroupMembers(group.state);
+      const hTag = nostrGroupId(group);
+      const relaysForGroup = group.relays ?? relays;
+
+      try {
+        const events = await client.network.request(relaysForGroup, [
+          {
+            kinds: [TASK_SNAPSHOT_KIND],
+            "#h": [hTag],
+            "#p": [pubkey],
+            limit: 1,
+          },
+        ]);
+        if (events.length === 0) return;
+
+        // Pick the most recent snapshot
+        const event = events.sort(
+          (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
+        )[0];
+
+        // Verify sender is a group member
+        if (!members.includes(event.pubkey as string)) return;
+
+        // Decrypt NIP-44 content
+        const plaintext = await signer.nip44!.decrypt(
+          event.pubkey as string,
+          event.content as string,
+        );
+        const snapshot: TaskEvent = JSON.parse(plaintext);
+        if (snapshot.type !== "task.snapshot") return;
+
+        // Persist the snapshot
+        await appendEvent(group.idStr, snapshot);
+        console.debug(
+          `[device-sync] loaded task snapshot for ${group.idStr.slice(0, 8)} (${(snapshot as any).tasks?.length ?? 0} tasks)`,
+        );
+      } catch (err) {
+        console.debug("[device-sync] task snapshot fetch failed:", err);
+      }
+    };
+
     const ingestGroupEvents = async (
       group: MarmotGroup,
       events: NostrEvent[],
@@ -157,6 +239,7 @@ export function useDeviceSync(
         if (result.kind === "rejected") {
           processed.add(result.event.id);
         }
+        // "unreadable" events are NOT added — they may become decryptable later
       }
 
       if (processed.size === 0) return;
@@ -187,11 +270,24 @@ export function useDeviceSync(
     const syncGroup = async (group: MarmotGroup): Promise<void> => {
       if (!mountedRef.current || groupSubs.has(group.idStr)) return;
 
+      // Wait for any in-progress join + pre-seed to complete
+      if (joinBarrier) await joinBarrier;
+
       attachAppMsgListener(group);
 
       const relaysForGroup = group.relays ?? relays;
       const hTag = nostrGroupId(group);
       const filter = { kinds: [445], "#h": [hTag] };
+
+      // For groups just joined via welcome, selfUpdate first.
+      if (pendingSelfUpdate.has(group.idStr)) {
+        pendingSelfUpdate.delete(group.idStr);
+        try {
+          await group.selfUpdate();
+        } catch {
+          // selfUpdate may fail if epoch changed; non-fatal
+        }
+      }
 
       try {
         const initialEvents = await client.network.request(relaysForGroup, [filter]);
@@ -255,9 +351,6 @@ export function useDeviceSync(
           const gd = group.groupData;
           if (!gd || !isAdmin(gd, pubkey)) continue;
           if (groupHasMember(group, inviteePubkey)) {
-            console.debug(
-              `[device-sync] skipping auto-invite for ${group.idStr}: ${inviteePubkey} is already a member`,
-            );
             continue;
           }
 
@@ -315,4 +408,49 @@ export function useDeviceSync(
       }
     };
   }, [client, pubkey, relays, signer]);
+}
+
+/**
+ * Publish a NIP-44 encrypted task snapshot for a specific invitee.
+ * Uses a replaceable event (kind 30078) so only the latest snapshot
+ * is stored on relays.
+ */
+export async function publishTaskSnapshot(
+  groupId: string,
+  groupHTag: string,
+  inviteeHex: string,
+  signer: EventSigner,
+  network: MarmotClient["network"],
+  relays: string[],
+): Promise<void> {
+  const events = await loadEvents(groupId);
+  if (events.length === 0) return;
+
+  const state = replayEvents(events);
+  const tasks = Array.from(state.values());
+  if (tasks.length === 0) return;
+
+  const snapshot: TaskEvent = { type: "task.snapshot", tasks };
+  const plaintext = JSON.stringify(snapshot);
+
+  const signerPubkey = await signer.getPublicKey();
+  const encrypted = await signer.nip44!.encrypt(inviteeHex, plaintext);
+
+  const unsignedEvent = {
+    kind: TASK_SNAPSHOT_KIND,
+    content: encrypted,
+    tags: [
+      ["d", `${SNAPSHOT_D_TAG}:${groupHTag}:${inviteeHex}`],
+      ["h", groupHTag],
+      ["p", inviteeHex],
+    ],
+    created_at: Math.floor(Date.now() / 1000),
+    pubkey: signerPubkey,
+  };
+
+  const signed = await signer.signEvent(unsignedEvent);
+  await network.publish(relays, signed);
+  console.debug(
+    `[device-sync] published task snapshot for ${groupId.slice(0, 8)} → ${inviteeHex.slice(0, 8)} (${tasks.length} tasks)`,
+  );
 }

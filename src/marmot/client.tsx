@@ -26,6 +26,7 @@ import { DEFAULT_RELAYS, NDK_CONNECT_TIMEOUT_MS } from "../config/relays";
 
 interface MarmotContextValue {
   client: MarmotClient | null;
+  signer: EventSigner | null;
   groups: MarmotGroup[];
   pubkey: string;
   relays: string[];
@@ -36,6 +37,7 @@ interface MarmotContextValue {
 
 const MarmotContext = createContext<MarmotContextValue>({
   client: null,
+  signer: null,
   groups: [],
   pubkey: "",
   relays: DEFAULT_RELAYS,
@@ -209,6 +211,7 @@ export function MarmotProvider({
 
   const contextValue: MarmotContextValue = {
     ...state,
+    signer,
     pubkey,
     relays,
   };

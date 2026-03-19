@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { getGroupMembers } from "@internet-privacy/marmot-ts";
+import { getGroupMembers, getNostrGroupIdHex } from "@internet-privacy/marmot-ts";
 import { NpubQrModal } from "@/components/NpubQrModal";
+import { publishTaskSnapshot } from "@/marmot/device-sync";
 
 interface GroupManagerProps {
   onGroupSelect: (groupId: string, groupName: string) => void;
@@ -18,7 +19,7 @@ export function GroupManager({
   onGroupSelect,
   selectedGroupId,
 }: GroupManagerProps) {
-  const { client, groups, relays, pubkey: selfPubkey, loading, error: marmotError } = useMarmot();
+  const { client, signer, groups, relays, pubkey: selfPubkey, loading, error: marmotError } = useMarmot();
   const [newGroupName, setNewGroupName] = useState("");
   const [inviteNpub, setInviteNpub] = useState("");
   const [creating, setCreating] = useState(false);
@@ -120,6 +121,20 @@ export function GroupManager({
       }
 
       await group.inviteByKeyPackageEvent(keyPackageEvents[0]);
+
+      // Publish NIP-44 encrypted task snapshot for the invitee.
+      // MLS application messages from before the invite epoch are
+      // undecryptable by the new member, so we send the current state
+      // outside MLS as a standard encrypted Nostr event.
+      if (client && signer) {
+        const groupHTag = getNostrGroupIdHex(group.state);
+        publishTaskSnapshot(
+          selectedGroupId, groupHTag, hex, signer, client.network, relays,
+        ).catch((err) => {
+          console.debug("[GroupManager] snapshot publish failed:", err);
+        });
+      }
+
       setInviteNpub("");
     } catch (err) {
       setError(
