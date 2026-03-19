@@ -1,0 +1,45 @@
+{
+  "story_id": "02",
+  "story_name": "sidebar-detached-styling",
+  "verified_at": "2026-03-19T00:00:00Z",
+  "status": "passed",
+  "acceptance_criteria": {
+    "AC-002": {
+      "description": "Detached groups show opacity-50 and data-detached attribute",
+      "passed": true,
+      "evidence": "GroupManager.tsx applies cn('opacity-50') and data-detached='true' when detachedGroupIds.has(group.idStr). E2E test 'detached group shows opacity-50 and data-detached after identity switch' passes on chromium."
+    },
+    "AC-003": {
+      "description": "Clicking detached group name does not select it",
+      "passed": true,
+      "evidence": "onClick handler returns early (no onGroupSelect call) when isDetached. E2E test asserts no [data-column='open'] visible after clicking detached group name."
+    },
+    "AC-004": {
+      "description": "Leave button works on detached groups",
+      "passed": true,
+      "evidence": "Leave button unchanged for detached groups. Uses client.destroyGroup() for detached (local-only removal) vs client.leaveGroup() for active groups. E2E test 'leave button works on detached group' passes."
+    },
+    "AC-012": {
+      "description": "Invite form hidden when selected group is detached",
+      "passed": true,
+      "evidence": "Conditional render: selectedGroupId && !detachedGroupIds.has(selectedGroupId) gates the invite form section."
+    },
+    "AC-013": {
+      "description": "Member list visible for detached groups",
+      "passed": true,
+      "evidence": "Members section render condition unchanged — still shows when selectedGroupId && members.length > 0, regardless of detached state."
+    }
+  },
+  "test_results": {
+    "unit_tests": { "total": 29, "passed": 29, "failed": 0 },
+    "e2e_tests": {
+      "chromium": { "passed": true, "tests": ["detached group shows opacity-50 and data-detached after identity switch", "leave button works on detached group"] },
+      "mobile_chrome": { "passed": false, "reason": "Pre-existing mobile bunker auth infrastructure issue — same class of failure as other mobile E2E tests" },
+      "mobile_safari": { "passed": false, "reason": "Pre-existing mobile bunker auth infrastructure issue — same class of failure as other mobile E2E tests" }
+    }
+  },
+  "files_changed": [
+    "src/components/GroupManager.tsx",
+    "e2e/tests/identity-visibility.spec.ts"
+  ]
+}

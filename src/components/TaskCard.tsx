@@ -75,53 +75,55 @@ export function TaskCard({
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        <Button
-          variant="ghost"
-          size="xs"
-          className="touch-target text-destructive hover:text-destructive"
-          data-testid="task-delete-btn"
-          onClick={() => onDelete(task.id)}
-          aria-label="Delete task"
-        >
-          <Trash2 className="size-3" />
-          Delete
-        </Button>
-        {nextStatus && (
+      {!isDetached && (
+        <div className="flex flex-wrap gap-1.5">
           <Button
-            variant="default"
+            variant="ghost"
             size="xs"
-            className="touch-target"
-            onClick={() => onStatusChange(task.id, nextStatus)}
-            aria-label={`Move to ${STATUS_LABELS[nextStatus]}`}
+            className="touch-target text-destructive hover:text-destructive"
+            data-testid="task-delete-btn"
+            onClick={() => onDelete(task.id)}
+            aria-label="Delete task"
           >
-            <ArrowRight className="size-3" />
-            Move to {STATUS_LABELS[nextStatus]}
+            <Trash2 className="size-3" />
+            Delete
           </Button>
-        )}
-        {currentUserPubkey && !isAssignedToMe && (
-          <Button
-            variant="outline"
-            size="xs"
-            className="touch-target"
-            onClick={() => onAssign(task.id, currentUserPubkey)}
-          >
-            <UserCheck className="size-3" />
-            Assign to me
-          </Button>
-        )}
-        {isAssignedToMe && (
-          <Button
-            variant="outline"
-            size="xs"
-            className="touch-target"
-            onClick={() => onAssign(task.id, null)}
-          >
-            <UserX className="size-3" />
-            Unassign
-          </Button>
-        )}
-      </div>
+          {nextStatus && (
+            <Button
+              variant="default"
+              size="xs"
+              className="touch-target"
+              onClick={() => onStatusChange(task.id, nextStatus)}
+              aria-label={`Move to ${STATUS_LABELS[nextStatus]}`}
+            >
+              <ArrowRight className="size-3" />
+              Move to {STATUS_LABELS[nextStatus]}
+            </Button>
+          )}
+          {currentUserPubkey && !isAssignedToMe && (
+            <Button
+              variant="outline"
+              size="xs"
+              className="touch-target"
+              onClick={() => onAssign(task.id, currentUserPubkey)}
+            >
+              <UserCheck className="size-3" />
+              Assign to me
+            </Button>
+          )}
+          {isAssignedToMe && (
+            <Button
+              variant="outline"
+              size="xs"
+              className="touch-target"
+              onClick={() => onAssign(task.id, null)}
+            >
+              <UserX className="size-3" />
+              Unassign
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

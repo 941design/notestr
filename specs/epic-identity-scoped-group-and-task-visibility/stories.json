@@ -45,7 +45,7 @@
         ],
         "playwright_file": "e2e/tests/identity-visibility.spec.ts"
       },
-      "status": "pending",
+      "status": "done",
       "notes": "Foundation story. Board and TaskCard receive isDetached but do nothing with it yet — the prop addition is the deliverable. All existing tests must remain green."
     },
     {
@@ -112,7 +112,7 @@
         ],
         "playwright_file": "e2e/tests/identity-visibility.spec.ts"
       },
-      "status": "pending",
+      "status": "done",
       "notes": "GroupManager already has the detachedGroupIds set from story 01. This story only adds conditional class/attribute application and click-handler override. The leave button path is intentionally unchanged."
     },
     {
@@ -163,7 +163,7 @@
         ],
         "playwright_file": "e2e/tests/identity-visibility.spec.ts"
       },
-      "status": "pending",
+      "status": "done",
       "notes": "Board receives isDetached from story 01's prop threading. The overlay is a simple conditional render replacing the column grid — not a modal or dialog. TaskCard receives isDetached via its existing props interface extended in story 01."
     },
     {
@@ -225,7 +225,7 @@
         ],
         "playwright_file": "e2e/tests/identity-visibility.spec.ts"
       },
-      "status": "pending",
+      "status": "done",
       "notes": "Bunker B is already wired in global-setup.ts (spawned as bunker-B) and auth-helper-b.ts exists. USER_B_NPUB is exported from auth-helper-b.ts. The invite flow triggers a NIP-44 snapshot publish (existing device-sync code) and an MLS welcome — the test may need a generous timeout (30-45s) for User B to receive and process the welcome event before the group appears in the sidebar."
     }
   ],

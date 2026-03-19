@@ -32,7 +32,7 @@ export function GroupManager({
   onGroupLeft,
   selectedGroupId,
 }: GroupManagerProps) {
-  const { client, signer, groups, relays, pubkey: selfPubkey, loading, error: marmotError } = useMarmot();
+  const { client, signer, groups, relays, pubkey: selfPubkey, loading, error: marmotError, detachedGroupIds } = useMarmot();
   const [newGroupName, setNewGroupName] = useState("");
   const [inviteNpub, setInviteNpub] = useState("");
   const [creating, setCreating] = useState(false);
@@ -166,7 +166,12 @@ export function GroupManager({
     setLeaving(true);
     setLeaveError(null);
     try {
-      await client.leaveGroup(pendingLeaveGroupId);
+      const isDetachedGroup = detachedGroupIds.has(pendingLeaveGroupId);
+      if (isDetachedGroup) {
+        await client.destroyGroup(pendingLeaveGroupId);
+      } else {
+        await client.leaveGroup(pendingLeaveGroupId);
+      }
       await clearEvents(pendingLeaveGroupId);
       setPendingLeaveGroupId(null);
       onGroupLeft?.();
@@ -195,36 +200,49 @@ export function GroupManager({
       )}
 
       <ul className="mb-5 space-y-1">
-        {groups.map((group) => (
-          <li
-            key={group.idStr}
-            aria-current={selectedGroupId === group.idStr ? "true" : undefined}
-            className={cn(
-              "touch-target rounded-sm px-3 py-2.5 text-sm transition-colors hover:bg-primary/[0.08] flex items-center gap-1",
-              selectedGroupId === group.idStr &&
-                "bg-primary/[0.15] text-primary",
-            )}
-          >
-            <span
-              className="block flex-1 truncate cursor-pointer"
-              onClick={() => onGroupSelect(group.idStr, group.groupData?.name || "Unnamed Group")}
+        {groups.map((group) => {
+          const isDetached = detachedGroupIds.has(group.idStr);
+          return (
+            <li
+              key={group.idStr}
+              aria-current={selectedGroupId === group.idStr ? "true" : undefined}
+              data-detached={isDetached ? "true" : undefined}
+              className={cn(
+                "touch-target rounded-sm px-3 py-2.5 text-sm transition-colors flex items-center gap-1",
+                isDetached
+                  ? "opacity-50"
+                  : "hover:bg-primary/[0.08]",
+                selectedGroupId === group.idStr &&
+                  !isDetached &&
+                  "bg-primary/[0.15] text-primary",
+              )}
             >
-              {group.groupData?.name || "Unnamed Group"}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              data-testid="group-leave-btn"
-              aria-label="Leave group"
-              onClick={(e) => {
-                e.stopPropagation();
-                setPendingLeaveGroupId(group.idStr);
-              }}
-            >
-              <LogOut className="size-3" />
-            </Button>
-          </li>
-        ))}
+              <span
+                className={cn("block flex-1 truncate", !isDetached && "cursor-pointer")}
+                onClick={() => {
+                  if (!isDetached) {
+                    onGroupSelect(group.idStr, group.groupData?.name || "Unnamed Group");
+                  }
+                }}
+              >
+                {group.groupData?.name || "Unnamed Group"}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                data-testid="group-leave-btn"
+                aria-label="Leave group"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLeaveError(null);
+                  setPendingLeaveGroupId(group.idStr);
+                }}
+              >
+                <LogOut className="size-3" />
+              </Button>
+            </li>
+          );
+        })}
         {!loading && groups.length === 0 && (
           <li className="cursor-default px-3 py-2.5 text-sm italic text-muted-foreground">
             No groups yet
@@ -252,7 +270,7 @@ export function GroupManager({
         </Button>
       </form>
 
-      {selectedGroupId && (
+      {selectedGroupId && !detachedGroupIds.has(selectedGroupId) && (
         <form className="mb-4 space-y-2" onSubmit={handleInvite}>
           <Label className="text-xs font-semibold text-muted-foreground">
             Invite Member
@@ -348,7 +366,7 @@ export function GroupManager({
 
       <AlertDialog
         open={pendingLeaveGroupId !== null}
-        onOpenChange={(open) => { if (!open && !leaving) setPendingLeaveGroupId(null); }}
+        onOpenChange={(open) => { if (!open && !leaving) { setLeaveError(null); setPendingLeaveGroupId(null); } }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>

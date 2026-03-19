@@ -229,7 +229,6 @@ export default function Page() {
     setAuthMethod(null);
     setSelectedGroupId(null);
     setSelectedGroupName(null);
-    clearLastGroup();
   }, [authMethod]);
 
   // Not yet connected: show connect screen

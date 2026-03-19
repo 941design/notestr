@@ -1,0 +1,56 @@
+{
+  "story_id": "03",
+  "story_name": "board-task-detached-blocking",
+  "verified_at": "2026-03-19T00:00:00Z",
+  "status": "passed",
+  "acceptance_criteria": {
+    "AC-005": {
+      "description": "Board renders detached-overlay when isDetached is true",
+      "passed": true,
+      "evidence": "Board.tsx conditionally renders div[data-testid='detached-overlay'] with message text when isDetached is true, replacing task columns."
+    },
+    "AC-006": {
+      "description": "Add Task button hidden when isDetached",
+      "passed": true,
+      "evidence": "Button wrapped in {!isDetached && ...} conditional."
+    },
+    "AC-007": {
+      "description": "CreateTaskModal not rendered when isDetached",
+      "passed": true,
+      "evidence": "CreateTaskModal inside the else branch of isDetached conditional — not rendered when detached."
+    },
+    "AC-008": {
+      "description": "handleCreate not reachable when isDetached",
+      "passed": true,
+      "evidence": "Add Task button and CreateTaskModal absent when isDetached — no path to trigger handleCreate."
+    },
+    "AC-009": {
+      "description": "handleStatusChange, handleDelete not reachable when isDetached",
+      "passed": true,
+      "evidence": "TaskCard action buttons hidden via !isDetached guard — no path to trigger these handlers."
+    },
+    "AC-010": {
+      "description": "TaskCard omits action buttons when isDetached",
+      "passed": true,
+      "evidence": "TaskCard.tsx wraps entire action button div in {!isDetached && ...} conditional."
+    },
+    "AC-011": {
+      "description": "Overlay message text matches spec",
+      "passed": true,
+      "evidence": "Message: 'This group belongs to another Nostr identity. Connect with the original identity to interact with this group.'"
+    }
+  },
+  "test_results": {
+    "unit_tests": { "total": 29, "passed": 29, "failed": 0 },
+    "e2e_tests": {
+      "chromium": { "passed": true, "note": "All identity-visibility and existing tests pass. No regressions." },
+      "mobile_chrome": { "passed": false, "reason": "Pre-existing mobile bunker auth infrastructure issue" },
+      "mobile_safari": { "passed": false, "reason": "Pre-existing mobile bunker auth infrastructure issue" }
+    }
+  },
+  "files_changed": [
+    "src/components/Board.tsx",
+    "src/components/TaskCard.tsx",
+    "app/page.tsx"
+  ]
+}

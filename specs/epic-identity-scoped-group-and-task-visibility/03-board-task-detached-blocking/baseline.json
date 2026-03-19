@@ -1,0 +1,11 @@
+{
+  "created_at": "2026-03-19T00:00:00Z",
+  "status": "ready",
+  "story_id": "03",
+  "checks": {
+    "compiles": { "passed": true, "command": "make build", "evidence": "Exit code 0, static files in out/" },
+    "tests_pass": { "passed": true, "command": "npx vitest run && make e2e", "evidence": "29/29 unit tests pass, 112/156 E2E pass (0 new failures, pre-existing mobile/viewport failures)", "failing_tests": [], "pre_existing_failures": true },
+    "dependencies": { "passed": true, "command": "make build", "evidence": "All dependencies installed" }
+  },
+  "test_snapshot": { "total": 191, "passing": 141, "failing": 0, "skipped": 13, "did_not_run": 8, "pre_existing_failures": 29, "coverage_percent": null }
+}

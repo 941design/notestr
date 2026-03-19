@@ -164,149 +164,164 @@ export function Board({ currentUserPubkey, isDetached = false }: BoardProps) {
       {/* Header row with title and Add Task button */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold">Tasks</h2>
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus className="size-4" />
-          Add Task
-        </Button>
+        {!isDetached && (
+          <Button onClick={() => setModalOpen(true)}>
+            <Plus className="size-4" />
+            Add Task
+          </Button>
+        )}
       </div>
 
-      {/* Mobile tab bar — hidden on tablet/desktop */}
-      <div className="mb-4 flex border-b md:hidden" role="tablist" aria-label="Task columns">
-        {COLUMNS.map(({ status, label }) => {
-          const count = tasks.filter((t) => t.status === status).length;
-          return (
-            <button
-              key={status}
-              role="tab"
-              aria-selected={activeTab === status}
-              onClick={() => setActiveTab(status)}
-              className={[
-                "flex flex-1 items-center justify-center gap-1.5 border-b-2 pb-2 pt-1 text-sm font-medium transition-colors",
-                activeTab === status
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground",
-              ].join(" ")}
-            >
-              {label}
-              <Badge variant="outline" className="text-xs px-1.5 py-0">
-                {count}
-              </Badge>
-            </button>
-          );
-        })}
-      </div>
+      {isDetached ? (
+        <div
+          data-testid="detached-overlay"
+          className="flex flex-1 items-center justify-center rounded-lg border bg-muted/50 p-8 text-center"
+        >
+          <p className="max-w-md text-sm text-muted-foreground">
+            This group belongs to another Nostr identity. Connect with the original identity to interact with this group.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile tab bar — hidden on tablet/desktop */}
+          <div className="mb-4 flex border-b md:hidden" role="tablist" aria-label="Task columns">
+            {COLUMNS.map(({ status, label }) => {
+              const count = tasks.filter((t) => t.status === status).length;
+              return (
+                <button
+                  key={status}
+                  role="tab"
+                  aria-selected={activeTab === status}
+                  onClick={() => setActiveTab(status)}
+                  className={[
+                    "flex flex-1 items-center justify-center gap-1.5 border-b-2 pb-2 pt-1 text-sm font-medium transition-colors",
+                    activeTab === status
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  ].join(" ")}
+                >
+                  {label}
+                  <Badge variant="outline" className="text-xs px-1.5 py-0">
+                    {count}
+                  </Badge>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Mobile single-column panel */}
-      <div className="flex-1 md:hidden" role="tabpanel">
-        {COLUMNS.filter(({ status }) => status === activeTab).map(({ status, label }) => {
-          const columnTasks = tasks.filter((t) => t.status === status);
-          return (
-            <div
-              key={status}
-              role="region"
-              aria-label={label}
-              data-column={status}
-              className="flex min-h-[300px] flex-col rounded-lg border bg-card p-3"
-            >
-              <div className="mb-3 flex items-center justify-between border-b pb-2">
-                <h3 className="text-sm font-semibold">{label}</h3>
-                <Badge variant="outline" className="text-xs">
-                  {columnTasks.length}
-                </Badge>
-              </div>
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onStatusChange={handleStatusChange}
-                    onAssign={handleAssign}
-                    onDelete={handleDelete}
-                    currentUserPubkey={currentUserPubkey}
-                    isDetached={isDetached}
-                  />
-                ))}
-                {columnTasks.length === 0 && (
-                  <p className="py-6 text-center text-sm italic text-muted-foreground">
-                    No tasks
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          {/* Mobile single-column panel */}
+          <div className="flex-1 md:hidden" role="tabpanel">
+            {COLUMNS.filter(({ status }) => status === activeTab).map(({ status, label }) => {
+              const columnTasks = tasks.filter((t) => t.status === status);
+              return (
+                <div
+                  key={status}
+                  role="region"
+                  aria-label={label}
+                  data-column={status}
+                  className="flex min-h-[300px] flex-col rounded-lg border bg-card p-3"
+                >
+                  <div className="mb-3 flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-semibold">{label}</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {columnTasks.length}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
+                    {columnTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onStatusChange={handleStatusChange}
+                        onAssign={handleAssign}
+                        onDelete={handleDelete}
+                        currentUserPubkey={currentUserPubkey}
+                        isDetached={isDetached}
+                      />
+                    ))}
+                    {columnTasks.length === 0 && (
+                      <p className="py-6 text-center text-sm italic text-muted-foreground">
+                        No tasks
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      {/* Tablet: 2-column grid with horizontal scroll; Desktop: 3-column grid */}
-      <div className="hidden md:grid md:flex-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
-        {COLUMNS.map(({ status, label }) => {
-          const columnTasks = tasks.filter((t) => t.status === status);
-          return (
-            <div
-              key={status}
-              role="region"
-              aria-label={label}
-              data-column={status}
-              className="flex min-h-[300px] flex-col rounded-lg border bg-card p-3"
-            >
-              <div className="mb-3 flex items-center justify-between border-b pb-2">
-                <h3 className="text-sm font-semibold">{label}</h3>
-                <Badge variant="outline" className="text-xs">
-                  {columnTasks.length}
-                </Badge>
-              </div>
-              <div className="flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
-                {columnTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    onStatusChange={handleStatusChange}
-                    onAssign={handleAssign}
-                    onDelete={handleDelete}
-                    currentUserPubkey={currentUserPubkey}
-                    isDetached={isDetached}
-                  />
-                ))}
-                {columnTasks.length === 0 && (
-                  <p className="py-6 text-center text-sm italic text-muted-foreground">
-                    No tasks
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+          {/* Tablet: 2-column grid with horizontal scroll; Desktop: 3-column grid */}
+          <div className="hidden md:grid md:flex-1 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+            {COLUMNS.map(({ status, label }) => {
+              const columnTasks = tasks.filter((t) => t.status === status);
+              return (
+                <div
+                  key={status}
+                  role="region"
+                  aria-label={label}
+                  data-column={status}
+                  className="flex min-h-[300px] flex-col rounded-lg border bg-card p-3"
+                >
+                  <div className="mb-3 flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-semibold">{label}</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {columnTasks.length}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
+                    {columnTasks.map((task) => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onStatusChange={handleStatusChange}
+                        onAssign={handleAssign}
+                        onDelete={handleDelete}
+                        currentUserPubkey={currentUserPubkey}
+                        isDetached={isDetached}
+                      />
+                    ))}
+                    {columnTasks.length === 0 && (
+                      <p className="py-6 text-center text-sm italic text-muted-foreground">
+                        No tasks
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-      <CreateTaskModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onCreate={handleCreate}
-      />
+          <CreateTaskModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onCreate={handleCreate}
+          />
 
-      <AlertDialog
-        open={pendingDeleteTaskId !== null}
-        onOpenChange={(open) => { if (!open) setPendingDeleteTaskId(null); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              data-testid="task-delete-confirm"
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={confirmDelete}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <AlertDialog
+            open={pendingDeleteTaskId !== null}
+            onOpenChange={(open) => { if (!open) setPendingDeleteTaskId(null); }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  data-testid="task-delete-confirm"
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={confirmDelete}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </div>
   );
 }

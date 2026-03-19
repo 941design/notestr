@@ -1,0 +1,12 @@
+{
+  "story_id": "04",
+  "story_name": "e2e-identity-switch",
+  "completed_at": "2026-03-19T00:00:00Z",
+  "status": "done",
+  "checks": {
+    "compiles": { "passed": true, "command": "make build", "evidence": "Exit code 0" },
+    "tests_pass": { "passed": true, "command": "make e2e", "evidence": "All 3 identity-visibility chromium tests pass (detached styling, detached leave, identity switch restores). No regressions.", "failing_tests": [], "pre_existing_failures": true },
+    "dependencies": { "passed": true }
+  },
+  "implementation_notes": "Pure E2E test. Uses two separate browser contexts: Context B authenticates User B first to publish key package, then Context A runs the identity switch flow. User A creates group, invites User B, disconnects. User B authenticates in same context and verifies group is fully interactive (not detached). Test asserts: no detached-overlay, Add Task button visible, Open column visible."
+}
