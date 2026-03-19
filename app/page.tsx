@@ -473,6 +473,7 @@ export default function Page() {
                   setSelectedGroupName(name);
                   setDrawerOpen(false);
                 }}
+                onGroupLeft={() => setSelectedGroupId(null)}
                 selectedGroupId={selectedGroupId}
               />
             </div>

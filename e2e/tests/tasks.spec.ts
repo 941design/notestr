@@ -60,3 +60,41 @@ test('create task: card appears in Open column', async ({ page }) => {
   const openColumn = page.locator('[data-column="open"]').first();
   await expect(openColumn).toContainText(TASK_TITLE, { timeout: 15000 });
 });
+
+test('delete task: card removed from board after confirmation', async ({ page }) => {
+  const GROUP_NAME = 'E2E Delete Task Group';
+  const TASK_TITLE = 'Task To Delete';
+
+  // On mobile, open drawer first
+  if (isMobile(page)) {
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.waitForTimeout(250);
+  }
+
+  // Create a group and task
+  await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
+  await page.getByRole('button', { name: 'Create' }).first().click();
+  const sidebar = page.locator('aside');
+  await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'Add Task' }).click();
+  await page.getByLabel('Title').fill(TASK_TITLE);
+  await page.getByRole('button', { name: 'Create' }).last().click();
+  const openColumn = page.locator('[data-column="open"]').first();
+  await expect(openColumn).toContainText(TASK_TITLE, { timeout: 15000 });
+
+  // Click Delete — confirmation dialog should appear
+  await page.locator('[data-testid="task-delete-btn"]').first().click();
+  await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 5000 });
+
+  // Cancel — task should still be there
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(openColumn).toContainText(TASK_TITLE, { timeout: 5000 });
+
+  // Delete again and confirm
+  await page.locator('[data-testid="task-delete-btn"]').first().click();
+  await page.locator('[data-testid="task-delete-confirm"]').click();
+
+  // Task should be gone from all columns
+  await expect(page.locator('[data-column="open"]').first()).not.toContainText(TASK_TITLE, { timeout: 10000 });
+});

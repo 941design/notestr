@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, UserPlus, Users, QrCode, ScanLine } from "lucide-react";
+import { LogOut, Plus, UserPlus, Users, QrCode, ScanLine } from "lucide-react";
 import { useMarmot } from "@/marmot/client";
 import { npubToHex, shortenPubkey, hexToNpub } from "@/lib/nostr";
 import { Input } from "@/components/ui/input";
@@ -9,14 +9,27 @@ import { cn } from "@/lib/utils";
 import { getGroupMembers, getNostrGroupIdHex } from "@internet-privacy/marmot-ts";
 import { NpubQrModal } from "@/components/NpubQrModal";
 import { publishTaskSnapshot } from "@/marmot/device-sync";
+import { clearEvents } from "@/store/persistence";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface GroupManagerProps {
   onGroupSelect: (groupId: string, groupName: string) => void;
+  onGroupLeft?: () => void;
   selectedGroupId: string | null;
 }
 
 export function GroupManager({
   onGroupSelect,
+  onGroupLeft,
   selectedGroupId,
 }: GroupManagerProps) {
   const { client, signer, groups, relays, pubkey: selfPubkey, loading, error: marmotError } = useMarmot();
@@ -27,6 +40,9 @@ export function GroupManager({
   const [error, setError] = useState<string | null>(null);
   const [scanQrOpen, setScanQrOpen] = useState(false);
   const [memberQr, setMemberQr] = useState<string | null>(null);
+  const [pendingLeaveGroupId, setPendingLeaveGroupId] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [members, setMembers] = useState<string[]>([]);
   const [profileNames, setProfileNames] = useState<Map<string, string>>(new Map());
   const profileCacheRef = useRef<Map<string, string>>(new Map());
@@ -145,6 +161,22 @@ export function GroupManager({
     }
   }
 
+  async function confirmLeave() {
+    if (!client || !pendingLeaveGroupId) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      await client.leaveGroup(pendingLeaveGroupId);
+      await clearEvents(pendingLeaveGroupId);
+      setPendingLeaveGroupId(null);
+      onGroupLeft?.();
+    } catch (err) {
+      setLeaveError(err instanceof Error ? err.message : "Failed to leave group");
+    } finally {
+      setLeaving(false);
+    }
+  }
+
   return (
     <nav aria-label="Groups">
       <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -168,15 +200,29 @@ export function GroupManager({
             key={group.idStr}
             aria-current={selectedGroupId === group.idStr ? "true" : undefined}
             className={cn(
-              "touch-target cursor-pointer rounded-sm px-3 py-2.5 text-sm transition-colors hover:bg-primary/[0.08] flex items-center",
+              "touch-target rounded-sm px-3 py-2.5 text-sm transition-colors hover:bg-primary/[0.08] flex items-center gap-1",
               selectedGroupId === group.idStr &&
                 "bg-primary/[0.15] text-primary",
             )}
-            onClick={() => onGroupSelect(group.idStr, group.groupData?.name || "Unnamed Group")}
           >
-            <span className="block truncate">
+            <span
+              className="block flex-1 truncate cursor-pointer"
+              onClick={() => onGroupSelect(group.idStr, group.groupData?.name || "Unnamed Group")}
+            >
               {group.groupData?.name || "Unnamed Group"}
             </span>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              data-testid="group-leave-btn"
+              aria-label="Leave group"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPendingLeaveGroupId(group.idStr);
+              }}
+            >
+              <LogOut className="size-3" />
+            </Button>
           </li>
         ))}
         {!loading && groups.length === 0 && (
@@ -295,6 +341,35 @@ export function GroupManager({
       {error && (
         <p className="mt-2 text-sm text-destructive">{error}</p>
       )}
+
+      {leaveError && (
+        <p className="mt-2 text-sm text-destructive">{leaveError}</p>
+      )}
+
+      <AlertDialog
+        open={pendingLeaveGroupId !== null}
+        onOpenChange={(open) => { if (!open && !leaving) setPendingLeaveGroupId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave this group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will lose access to all its tasks.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={leaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="group-leave-confirm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmLeave}
+              disabled={leaving}
+            >
+              {leaving ? "Leaving..." : "Leave"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </nav>
   );
 }

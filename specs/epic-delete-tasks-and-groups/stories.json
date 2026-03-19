@@ -1,0 +1,122 @@
+{
+  "epic_name": "delete-tasks-and-groups",
+  "created_at": "2026-03-19T00:00:00Z",
+  "updated_at": "2026-03-19T00:00:00Z",
+  "total_stories": 3,
+  "stories": [
+    {
+      "id": "01",
+      "name": "alert-dialog-component",
+      "title": "Add AlertDialog shadcn/ui component",
+      "description": "Scaffold src/components/ui/alert-dialog.tsx using the @radix-ui/react-alert-dialog primitive already present in node_modules. Follow the same pattern as the existing dialog.tsx wrapper. No functional behavior — this is a pure UI primitive story.",
+      "acceptance_criteria": [],
+      "scope": {
+        "includes": [
+          "src/components/ui/alert-dialog.tsx (new shadcn wrapper)",
+          "Export: AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel"
+        ],
+        "excludes": ["No usage in other components yet", "No tests for the component itself"]
+      },
+      "complexity": "low",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [],
+        "notes": "No E2E scenario for this story — it is a pure UI primitive. E2E coverage comes in stories 02 and 03."
+      },
+      "status": "pending",
+      "notes": "radix-ui/react-alert-dialog is already in node_modules (available transitively). Copy the shadcn/ui alert-dialog component pattern."
+    },
+    {
+      "id": "02",
+      "name": "delete-task",
+      "title": "Add Delete Task UI and dispatch",
+      "description": "Add a Delete button (Trash2 icon, data-testid='task-delete-btn') to TaskCard. Board holds the AlertDialog confirmation state. On confirm (data-testid='task-delete-confirm'), dispatch a task.deleted event via the existing dispatch() mechanism. Add E2E test for delete task flow.",
+      "acceptance_criteria": ["AC-001", "AC-002", "AC-003", "AC-004"],
+      "scope": {
+        "includes": [
+          "src/components/TaskCard.tsx: add onDelete prop + Trash2 button",
+          "src/components/Board.tsx: add handleDelete(), AlertDialog state, pass onDelete to TaskCard at both mobile+desktop call sites",
+          "e2e/tests/tasks.spec.ts: add delete task test case"
+        ],
+        "excludes": [
+          "No changes to task-events.ts or task-reducer.ts (already complete)",
+          "No changes to task-store.tsx",
+          "No changes to persistence.ts"
+        ]
+      },
+      "complexity": "low",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "Delete a task",
+            "docker_services": ["docker-compose.e2e.yml strfry relay"],
+            "playwright_file": "e2e/tests/tasks.spec.ts",
+            "steps": [
+              "Authenticate via bunker (authenticateViaBunker)",
+              "Create a group + create a task (reuse existing helpers)",
+              "Click [data-testid='task-delete-btn'] on the task card (.first())",
+              "Assert confirmation dialog visible",
+              "Click Cancel → assert task still in [data-column='open']",
+              "Click task-delete-btn again → click [data-testid='task-delete-confirm']",
+              "Assert task title no longer present in any [data-column] within 10s"
+            ]
+          }
+        ]
+      },
+      "status": "pending",
+      "notes": "Depends on story 01 (AlertDialog component). Board must track pendingDeleteTaskId state for the dialog. Use isMobile guard and .first() on locators per existing E2E conventions."
+    },
+    {
+      "id": "03",
+      "name": "leave-group",
+      "title": "Add Leave Group UI and marmot integration",
+      "description": "Add a Leave button (LogOut icon, data-testid='group-leave-btn', always visible) to each group item in GroupManager. On confirm (data-testid='group-leave-confirm'): call client.leaveGroup(groupId), call clearEvents(groupId), call onGroupLeft() callback. Page resets selectedGroupId to null. Error shown inline. Add E2E test for leave group flow.",
+      "acceptance_criteria": ["AC-005", "AC-006", "AC-007", "AC-008", "AC-009"],
+      "scope": {
+        "includes": [
+          "src/components/GroupManager.tsx: add onGroupLeft prop + LogOut icon button per group item + AlertDialog confirmation + leaveGroup call + clearEvents call + inline error",
+          "app/page.tsx: add onGroupLeft handler that calls setSelectedGroupId(null)",
+          "e2e/tests/groups.spec.ts: add leave group test case"
+        ],
+        "excludes": [
+          "No changes to marmot-ts library",
+          "No changes to persistence.ts (clearEvents already correct)",
+          "No multi-member scenarios"
+        ]
+      },
+      "complexity": "medium",
+      "mock_dependencies": [],
+      "introduces_mocks": [],
+      "test_fixtures": [],
+      "e2e_test_plan": {
+        "scenarios": [
+          {
+            "name": "Leave a group",
+            "docker_services": ["docker-compose.e2e.yml strfry relay"],
+            "playwright_file": "e2e/tests/groups.spec.ts",
+            "steps": [
+              "Authenticate via bunker (authenticateViaBunker)",
+              "Create a group, assert it appears in sidebar",
+              "Click [data-testid='group-leave-btn'] (.first())",
+              "Assert confirmation dialog visible",
+              "Click Cancel → assert group still in sidebar",
+              "Click group-leave-btn again → click [data-testid='group-leave-confirm']",
+              "Assert group name no longer in sidebar within 15s",
+              "Assert board/task heading not visible (group deselected)"
+            ]
+          }
+        ]
+      },
+      "status": "pending",
+      "notes": "Depends on story 01 (AlertDialog component). GroupManager needs onGroupLeft?: () => void prop; page.tsx wires it. After client.leaveGroup() succeeds, groupsUpdated fires automatically removing the group from the list. clearEvents() must be called before or after leaveGroup() — call after success to avoid clearing if network fails."
+    }
+  ],
+  "story_order": ["01", "02", "03"],
+  "dependency_notes": "Story 01 (AlertDialog) must complete before 02 and 03 since both use it. Stories 02 and 03 are independent of each other after 01.",
+  "mock_resolution_plan": "No temporary mocks introduced. All stories use real implementations."
+}

@@ -6,6 +6,16 @@ import { TaskCard } from "@/components/TaskCard";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface BoardProps {
   currentUserPubkey: string | null;
@@ -28,6 +38,7 @@ export function Board({ currentUserPubkey }: BoardProps) {
   const { tasks, dispatch, loading } = useTaskStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TaskStatus>("open");
+  const [pendingDeleteTaskId, setPendingDeleteTaskId] = useState<string | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
   const liveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,6 +67,22 @@ export function Board({ currentUserPubkey }: BoardProps) {
       updatedBy: currentUserPubkey ?? "unknown",
     });
     announceStatusChange(status);
+  }
+
+  function handleDelete(taskId: string) {
+    setPendingDeleteTaskId(taskId);
+  }
+
+  async function confirmDelete() {
+    if (!pendingDeleteTaskId) return;
+    const now = Math.floor(Date.now() / 1000);
+    await dispatch({
+      type: "task.deleted",
+      taskId: pendingDeleteTaskId,
+      updatedAt: now,
+      updatedBy: currentUserPubkey ?? "unknown",
+    });
+    setPendingDeleteTaskId(null);
   }
 
   async function handleAssign(taskId: string, assignee: string | null) {
@@ -193,6 +220,7 @@ export function Board({ currentUserPubkey }: BoardProps) {
                     task={task}
                     onStatusChange={handleStatusChange}
                     onAssign={handleAssign}
+                    onDelete={handleDelete}
                     currentUserPubkey={currentUserPubkey}
                   />
                 ))}
@@ -232,6 +260,7 @@ export function Board({ currentUserPubkey }: BoardProps) {
                     task={task}
                     onStatusChange={handleStatusChange}
                     onAssign={handleAssign}
+                    onDelete={handleDelete}
                     currentUserPubkey={currentUserPubkey}
                   />
                 ))}
@@ -251,6 +280,30 @@ export function Board({ currentUserPubkey }: BoardProps) {
         onClose={() => setModalOpen(false)}
         onCreate={handleCreate}
       />
+
+      <AlertDialog
+        open={pendingDeleteTaskId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteTaskId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="task-delete-confirm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

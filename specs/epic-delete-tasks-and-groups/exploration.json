@@ -1,0 +1,57 @@
+{
+  "created_at": "2026-03-19T00:00:00Z",
+  "key_files": [
+    { "path": "src/components/TaskCard.tsx", "lines": "112", "relevance": "Add onDelete prop and Trash2 button; no AlertDialog needed here — Board holds the confirm dialog", "source": "similar-features" },
+    { "path": "src/components/Board.tsx", "lines": "256", "relevance": "Wire handleDelete(), pass onDelete to TaskCard at both mobile and desktop call sites; hold AlertDialog state", "source": "similar-features" },
+    { "path": "src/components/GroupManager.tsx", "lines": "300", "relevance": "Add leave-group UI: LogOut icon button always visible per group item; leaveGroup() call; onGroupLeft callback; inline error display", "source": "similar-features" },
+    { "path": "src/store/task-events.ts", "lines": "63", "relevance": "task.deleted event type already defined — no changes needed", "source": "architecture" },
+    { "path": "src/store/task-reducer.ts", "lines": "77", "relevance": "task.deleted already handled in applyEvent() with LWW guard — no changes needed", "source": "architecture" },
+    { "path": "src/store/task-store.tsx", "lines": "132", "relevance": "dispatch() already handles any TaskEvent including task.deleted — no changes needed", "source": "architecture" },
+    { "path": "src/store/persistence.ts", "lines": "40", "relevance": "clearEvents(groupId) sets array to [] — sufficient for leave cleanup", "source": "architecture" },
+    { "path": "src/marmot/client.tsx", "lines": "237", "relevance": "useMarmot() provides client; groupsUpdated listener auto-updates sidebar after leaveGroup()", "source": "architecture" },
+    { "path": "app/page.tsx", "lines": "535", "relevance": "Manages selectedGroupId state; must reset to null on group leave; wires GroupManager with onGroupSelect", "source": "architecture" },
+    { "path": "src/store/task-reducer.test.ts", "lines": "197", "relevance": "Unit tests for task.deleted already exist (accept + reject paths); extend for Board dispatch", "source": "testing-and-conventions" },
+    { "path": "e2e/tests/tasks.spec.ts", "lines": "63", "relevance": "Model for delete-task E2E test; uses isMobile guard, .first() on locators, data-column selector", "source": "testing-and-conventions" },
+    { "path": "e2e/tests/groups.spec.ts", "lines": "45", "relevance": "Model for leave-group E2E test; group-create then assert pattern", "source": "testing-and-conventions" },
+    { "path": "e2e/fixtures/auth-helper.ts", "lines": "34", "relevance": "authenticateViaBunker(page) — required by all E2E tests", "source": "testing-and-conventions" },
+    { "path": "e2e/fixtures/cleanup.ts", "lines": "40", "relevance": "clearAppState(page) — called in beforeEach of every spec", "source": "testing-and-conventions" }
+  ],
+  "patterns": [
+    { "name": "Prop-threading for card actions", "description": "TaskCardProps declares all callbacks; Board creates handle* async functions and passes by reference to each TaskCard at both mobile and desktop call sites", "reference": "src/components/TaskCard.tsx:9" },
+    { "name": "Optimistic dispatch pattern", "description": "Board.handle*() calls dispatch(event); task-store applies optimistically + persists to IDB + sends to MLS", "reference": "src/store/task-store.tsx:91" },
+    { "name": "Local async state in GroupManager", "description": "Paired useState<boolean> for in-flight flag + useState<string|null> for error; try/catch/finally; error rendered as <p className='text-destructive'>", "reference": "src/components/GroupManager.tsx:25" },
+    { "name": "Callback prop for parent notification", "description": "GroupManager notifies page via onGroupSelect callback; leave should add onGroupLeft?: () => void prop", "reference": "src/components/GroupManager.tsx:13" },
+    { "name": "E2E isMobile drawer guard", "description": "page.viewportSize().width < 768 check before sidebar interaction; getByRole button open-menu", "reference": "e2e/tests/tasks.spec.ts:17" },
+    { "name": "E2E strict-mode .first()", "description": "All locators matching desktop+mobile DOM duplicates must use .first()", "reference": "e2e/tests/tasks.spec.ts:39" },
+    { "name": "data-testid for E2E targets", "description": "Interactive elements get data-testid; task delete: task-delete-btn/task-delete-confirm; group leave: group-leave-btn/group-leave-confirm", "reference": "src/components/ConnectionStatus.tsx:40" }
+  ],
+  "similar_features": [
+    "Task status change (Board.tsx:49) — identical dispatch pattern for task.deleted",
+    "Task assign/unassign (Board.tsx:60) — identical prop-threading model",
+    "Disconnect button (ConnectionStatus.tsx:63) — destructive action with data-testid"
+  ],
+  "architecture": {
+    "task_delete": "Frontend-only: add onDelete prop to TaskCard, handleDelete in Board, AlertDialog for confirmation, dispatch task.deleted event. Backend/reducer already complete.",
+    "group_leave": "Add onGroupLeft prop to GroupManager; call client.leaveGroup(groupId) then clearEvents(groupId); GroupManager emits onGroupLeft on success; page.tsx resets selectedGroupId to null. groupsUpdated event from marmot auto-removes group from sidebar."
+  },
+  "extension_points": [
+    "TaskCard: add onDelete prop + Trash2 button",
+    "Board: add handleDelete + AlertDialog state + onDelete wiring",
+    "GroupManager: add onGroupLeft prop + LogOut button + leaveGroup() call",
+    "app/page.tsx: add onGroupLeft handler resetting selectedGroupId",
+    "src/components/ui/alert-dialog.tsx: new shadcn component (radix already present)"
+  ],
+  "testing": {
+    "unit": "Extend task-reducer.test.ts with Board-level dispatch test; existing reducer tests already cover accept/reject paths",
+    "e2e": "New e2e/tests/tasks.spec.ts test: create task → click delete btn → confirm → assert task gone. New e2e/tests/groups.spec.ts test: create group → click leave btn → confirm → assert group gone from sidebar."
+  },
+  "conventions": [
+    "Named exports only (export function)",
+    "Async handlers inside component body (not useCallback unless needed as dependency)",
+    "Lucide icons from lucide-react: Trash2 for delete, LogOut for leave",
+    "Button size='xs' or size='icon-xs' for action buttons in cards",
+    "cn() from @/lib/utils for conditional Tailwind classes",
+    "Vitest: explicit imports (describe/it/expect from 'vitest'), environment: node",
+    "E2E: all commands via make; baseURL localhost:3100"
+  ]
+}

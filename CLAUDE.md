@@ -14,3 +14,9 @@ This project is developed across Linux x86_64 and macOS ARM (darwin-arm64). Nati
 - Use the `playwright-browser` agent for browser interactions, not MCP Playwright tools directly.
 - MCP tool calls return verbose snapshots and logs that bloat the main context. The agent handles that internally and returns a concise summary.
 - Only use MCP Playwright tools directly for quick, single-step checks (one screenshot or one snapshot).
+
+## Documentation
+
+This project maintains a technical specification in ./docs/task-protocol.md describing the task management protocol over nostr MLS.
+
+- Whenever you work on task state, task datamodel or similar, check whether the protocol needs to be updated.

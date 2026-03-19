@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, UserCheck, UserX } from "lucide-react";
+import { ArrowRight, Trash2, UserCheck, UserX } from "lucide-react";
 import { shortenPubkey } from "@/lib/nostr";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ interface TaskCardProps {
   task: Task;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onAssign: (taskId: string, assignee: string | null) => void;
+  onDelete: (taskId: string) => void;
   currentUserPubkey: string | null;
 }
 
@@ -42,6 +43,7 @@ export function TaskCard({
   task,
   onStatusChange,
   onAssign,
+  onDelete,
   currentUserPubkey,
 }: TaskCardProps) {
   const nextStatus = getNextStatus(task.status);
@@ -72,6 +74,17 @@ export function TaskCard({
       </div>
 
       <div className="flex flex-wrap gap-1.5">
+        <Button
+          variant="ghost"
+          size="xs"
+          className="touch-target text-destructive hover:text-destructive"
+          data-testid="task-delete-btn"
+          onClick={() => onDelete(task.id)}
+          aria-label="Delete task"
+        >
+          <Trash2 className="size-3" />
+          Delete
+        </Button>
         {nextStatus && (
           <Button
             variant="default"

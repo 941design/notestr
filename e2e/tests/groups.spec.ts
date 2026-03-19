@@ -43,3 +43,37 @@ test('create group: name appears in sidebar', async ({ page }) => {
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 30000 });
 });
+
+test('leave group: group removed from sidebar after confirmation', async ({ page }) => {
+  const GROUP_NAME = 'E2E Leave Group';
+
+  // On mobile, open drawer first
+  if (isMobile(page)) {
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.waitForTimeout(250);
+  }
+
+  // Create a group
+  await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
+  await page.getByRole('button', { name: 'Create' }).first().click();
+  const sidebar = page.locator('aside');
+  await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 30000 });
+
+  // Click Leave — confirmation dialog should appear
+  await page.locator('[data-testid="group-leave-btn"]').first().click();
+  await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 5000 });
+
+  // Cancel — group should still be in sidebar
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 5000 });
+
+  // Leave again and confirm
+  await page.locator('[data-testid="group-leave-btn"]').first().click();
+  await page.locator('[data-testid="group-leave-confirm"]').click();
+
+  // Group should be gone from the sidebar
+  await expect(sidebar.getByText(GROUP_NAME).first()).not.toBeVisible({ timeout: 15000 });
+
+  // Board should be deselected (Tasks heading gone)
+  await expect(page.getByRole('heading', { name: 'Tasks' })).not.toBeVisible({ timeout: 5000 });
+});
