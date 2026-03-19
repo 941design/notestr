@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, UserPlus, Users } from "lucide-react";
+import { Plus, UserPlus, Users, QrCode, ScanLine } from "lucide-react";
 import { useMarmot } from "@/marmot/client";
 import { npubToHex, shortenPubkey, hexToNpub } from "@/lib/nostr";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { getGroupMembers } from "@internet-privacy/marmot-ts";
+import { NpubQrModal } from "@/components/NpubQrModal";
 
 interface GroupManagerProps {
   onGroupSelect: (groupId: string, groupName: string) => void;
@@ -23,6 +24,8 @@ export function GroupManager({
   const [creating, setCreating] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanQrOpen, setScanQrOpen] = useState(false);
+  const [memberQr, setMemberQr] = useState<string | null>(null);
   const [members, setMembers] = useState<string[]>([]);
   const [profileNames, setProfileNames] = useState<Map<string, string>>(new Map());
   const profileCacheRef = useRef<Map<string, string>>(new Map());
@@ -193,12 +196,25 @@ export function GroupManager({
           <Label className="text-xs font-semibold text-muted-foreground">
             Invite Member
           </Label>
-          <Input
-            placeholder="npub1..."
-            value={inviteNpub}
-            onChange={(e) => setInviteNpub(e.target.value)}
-            disabled={inviting}
-          />
+          <div className="flex gap-1.5">
+            <Input
+              placeholder="npub1..."
+              value={inviteNpub}
+              onChange={(e) => setInviteNpub(e.target.value)}
+              disabled={inviting}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setScanQrOpen(true)}
+              aria-label="Scan QR code"
+              data-testid="invite-scan-qr-btn"
+            >
+              <ScanLine className="size-4" />
+            </Button>
+          </div>
           <Button
             type="submit"
             className="w-full"
@@ -207,6 +223,17 @@ export function GroupManager({
             <UserPlus className="size-4" />
             {inviting ? "Inviting..." : "Invite"}
           </Button>
+          <NpubQrModal
+            isOpen={scanQrOpen}
+            onClose={() => setScanQrOpen(false)}
+            title="Scan npub QR"
+            mode="scan"
+            onScan={(scannedNpub) => {
+              setInviteNpub(scannedNpub);
+              setError(null);
+              setScanQrOpen(false);
+            }}
+          />
         </form>
       )}
 
@@ -220,14 +247,33 @@ export function GroupManager({
               <li
                 key={hex}
                 data-testid="member-item"
-                className="touch-target truncate px-3 py-1.5 text-sm font-mono text-muted-foreground flex items-center"
+                className="touch-target truncate px-3 py-1.5 text-sm font-mono text-muted-foreground flex items-center gap-1"
                 title={hexToNpub(hex)}
               >
-                {profileNames.get(hex) ?? shortenPubkey(hex)}
-                {hex === selfPubkey && " (you)"}
+                <span className="flex-1 truncate">
+                  {profileNames.get(hex) ?? shortenPubkey(hex)}
+                  {hex === selfPubkey && " (you)"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => setMemberQr(hex)}
+                  aria-label="Show QR code"
+                  data-testid={`member-show-qr-${hex.slice(0, 8)}`}
+                >
+                  <QrCode className="size-3" />
+                </Button>
               </li>
             ))}
           </ul>
+
+          <NpubQrModal
+            isOpen={memberQr !== null}
+            onClose={() => setMemberQr(null)}
+            title={memberQr ? (profileNames.get(memberQr) ?? shortenPubkey(memberQr)) : ""}
+            mode="display"
+            npub={memberQr ? hexToNpub(memberQr) : undefined}
+          />
         </section>
       )}
 
