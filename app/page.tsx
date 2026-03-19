@@ -33,11 +33,29 @@ import { DEFAULT_RELAYS, NOSTRCONNECT_RELAY } from "@/config/relays";
 
 type AuthMethod = "nip07" | "nip46" | null;
 
+const LAST_GROUP_KEY = "notestr:lastGroup";
+
+function saveLastGroup(id: string, name: string) {
+  try { localStorage.setItem(LAST_GROUP_KEY, JSON.stringify({ id, name })); } catch {}
+}
+function loadLastGroup(): { id: string; name: string } | null {
+  try {
+    const raw = localStorage.getItem(LAST_GROUP_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.id === "string" && typeof parsed.name === "string") return parsed;
+  } catch {}
+  return null;
+}
+function clearLastGroup() {
+  try { localStorage.removeItem(LAST_GROUP_KEY); } catch {}
+}
+
 export default function Page() {
   const [signer, setSigner] = useState<EventSigner | null>(null);
   const [pubkey, setPubkey] = useState<string | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [selectedGroupName, setSelectedGroupName] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => loadLastGroup()?.id ?? null);
+  const [selectedGroupName, setSelectedGroupName] = useState<string | null>(() => loadLastGroup()?.name ?? null);
   const [signerChecked, setSignerChecked] = useState(false);
   const [connectingTooSlow, setConnectingTooSlow] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);
@@ -205,6 +223,7 @@ export default function Page() {
     setAuthMethod(null);
     setSelectedGroupId(null);
     setSelectedGroupName(null);
+    clearLastGroup();
   }, [authMethod]);
 
   // Not yet connected: show connect screen
@@ -471,9 +490,10 @@ export default function Page() {
                 onGroupSelect={(id, name) => {
                   setSelectedGroupId(id);
                   setSelectedGroupName(name);
+                  saveLastGroup(id, name);
                   setDrawerOpen(false);
                 }}
-                onGroupLeft={() => setSelectedGroupId(null)}
+                onGroupLeft={() => { setSelectedGroupId(null); setSelectedGroupName(null); clearLastGroup(); }}
                 selectedGroupId={selectedGroupId}
               />
             </div>
@@ -492,6 +512,7 @@ export default function Page() {
                   onGroupSelect={(id, name) => {
                     setSelectedGroupId(id);
                     setSelectedGroupName(name);
+                    saveLastGroup(id, name);
                     setDrawerOpen(false);
                   }}
                   selectedGroupId={selectedGroupId}
