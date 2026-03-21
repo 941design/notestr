@@ -114,8 +114,8 @@ export function useDeviceSync(
               const ids = new Set(existing.map((e) => e.id));
               syncedEventIds.set(group.idStr, ids);
               await addSyncedGroupEventIds(group.idStr, ids);
-            } catch {
-              // Non-fatal
+            } catch (err) {
+              console.warn("[device-sync] pre-seed relay fetch failed:", err);
             }
 
             // Fetch task snapshot (NIP-44 encrypted, sent by inviter)
@@ -257,9 +257,11 @@ export function useDeviceSync(
           const rumor: Rumor = deserializeApplicationData(data);
           if (rumor.kind !== TASK_EVENT_KIND) return;
           const taskEvent: TaskEvent = JSON.parse(rumor.content);
-          appendEvent(group.idStr, taskEvent).catch(() => {});
-        } catch {
-          // Not a task event or malformed — ignore
+          appendEvent(group.idStr, taskEvent).catch((err) => {
+            console.warn("[device-sync] appendEvent failed:", err);
+          });
+        } catch (err) {
+          console.debug("[device-sync] applicationMessage parse error:", err);
         }
       });
     };

@@ -126,17 +126,23 @@ export function MarmotProvider({
       // Rotate consumed key packages after joining a group
       client.on("groupJoined", async () => {
         if (!mountedRef.current) return;
-        const packages = await client.keyPackages.list();
-        for (const pkg of packages.filter((p) => p.used)) {
-          await client.keyPackages.rotate(pkg.keyPackageRef, { relays });
-        }
-        // Re-evaluate discoverability
-        const updated = await client.keyPackages.list();
-        const nowDiscoverable = updated.some(
-          (p) => !p.used && p.published && p.published.length > 0,
-        );
-        if (mountedRef.current) {
-          setState((prev) => ({ ...prev, discoverable: nowDiscoverable }));
+        try {
+          const packages = await client.keyPackages.list();
+          const usedCount = packages.filter((p) => p.used).length;
+          console.debug("[marmot] groupJoined — rotating", usedCount, "used key packages");
+          for (const pkg of packages.filter((p) => p.used)) {
+            await client.keyPackages.rotate(pkg.keyPackageRef, { relays });
+          }
+          // Re-evaluate discoverability
+          const updated = await client.keyPackages.list();
+          const nowDiscoverable = updated.some(
+            (p) => !p.used && p.published && p.published.length > 0,
+          );
+          if (mountedRef.current) {
+            setState((prev) => ({ ...prev, discoverable: nowDiscoverable }));
+          }
+        } catch (err) {
+          console.error("[marmot] groupJoined key package rotation failed:", err);
         }
       });
 
@@ -148,8 +154,20 @@ export function MarmotProvider({
             (p) => !p.used && p.published && p.published.length > 0,
           );
 
+          console.debug(
+            "[marmot] key packages:",
+            existingPackages.length,
+            "total,",
+            existingPackages.filter((p) => !p.used).length,
+            "unused,",
+            "hasUsable:",
+            hasUsable,
+          );
+
           if (!hasUsable && relays.length > 0) {
+            console.debug("[marmot] creating key package for relays:", relays);
             await client.keyPackages.create({ relays });
+            console.debug("[marmot] key package created successfully");
           }
 
           // Publish kind 10051 relay list only if relay doesn't already have one
@@ -159,6 +177,7 @@ export function MarmotProvider({
             ]);
 
             if (existing10051.length === 0) {
+              console.debug("[marmot] publishing kind 10051 relay list");
               const unsigned = createKeyPackageRelayListEvent({
                 pubkey,
                 relays,
@@ -166,9 +185,11 @@ export function MarmotProvider({
               const signed = await signer.signEvent(unsigned);
               const ndkEvent = new NDKEvent(ndk, signed);
               const relaySet = NDKRelaySet.fromRelayUrls(relays, ndk);
-              await ndkEvent.publish(relaySet).catch(() => {
-                // Non-fatal: invite flow degrades gracefully
+              await ndkEvent.publish(relaySet).catch((err) => {
+                console.warn("[marmot] kind 10051 publish failed:", err);
               });
+            } else {
+              console.debug("[marmot] kind 10051 already exists on relay");
             }
           }
 
@@ -179,9 +200,10 @@ export function MarmotProvider({
           const nowDiscoverable = updated.some(
             (p) => !p.used && p.published && p.published.length > 0,
           );
+          console.debug("[marmot] discoverable:", nowDiscoverable);
           setState((prev) => ({ ...prev, discoverable: nowDiscoverable }));
-        } catch {
-          // Non-fatal: discoverability degrades gracefully
+        } catch (err) {
+          console.error("[marmot] key package background init failed:", err);
         }
       })();
     } catch (err) {
