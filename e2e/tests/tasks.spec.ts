@@ -37,7 +37,7 @@ test('create task: card appears in Open column', async ({ page }) => {
 
   // Create a group first — use .first() since GroupManager may render in multiple containers
   await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
-  await page.getByRole('button', { name: 'Create' }).first().click();
+  await page.getByRole('button', { name: 'Create', exact: true }).first().click();
 
   // Wait for the group to appear in the sidebar and get selected automatically
   const sidebar = page.locator('aside');
@@ -52,8 +52,8 @@ test('create task: card appears in Open column', async ({ page }) => {
   // Fill in the task title
   await page.getByLabel('Title').fill(TASK_TITLE);
 
-  // Submit the form
-  await page.getByRole('button', { name: 'Create' }).last().click();
+  // Submit the form (modal Create button)
+  await page.getByRole('button', { name: 'Create', exact: true }).last().click();
 
   // The task card should appear in the "Open" column (data-column="open").
   // Use .first() and toContainText: both mobile and desktop layouts exist in DOM.
@@ -73,18 +73,21 @@ test('delete task: card removed from board after confirmation', async ({ page })
 
   // Create a group and task
   await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
-  await page.getByRole('button', { name: 'Create' }).first().click();
+  await page.getByRole('button', { name: 'Create', exact: true }).first().click();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible({ timeout: 10000 });
   await page.getByRole('button', { name: 'Add Task' }).click();
   await page.getByLabel('Title').fill(TASK_TITLE);
-  await page.getByRole('button', { name: 'Create' }).last().click();
-  const openColumn = page.locator('[data-column="open"]').first();
+  await page.getByRole('button', { name: 'Create', exact: true }).last().click();
+  // Use last() on desktop (mobile panel is first in DOM but hidden); first() on mobile
+  const openColumn = isMobile(page)
+    ? page.locator('[data-column="open"]').first()
+    : page.locator('[data-column="open"]').last();
   await expect(openColumn).toContainText(TASK_TITLE, { timeout: 15000 });
 
-  // Click Delete — confirmation dialog should appear
-  await page.locator('[data-testid="task-delete-btn"]').first().click();
+  // Click Delete — use the visible delete button (scoped to visible column)
+  await openColumn.locator('[data-testid="task-delete-btn"]').click();
   await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 5000 });
 
   // Cancel — task should still be there
@@ -92,9 +95,9 @@ test('delete task: card removed from board after confirmation', async ({ page })
   await expect(openColumn).toContainText(TASK_TITLE, { timeout: 5000 });
 
   // Delete again and confirm
-  await page.locator('[data-testid="task-delete-btn"]').first().click();
+  await openColumn.locator('[data-testid="task-delete-btn"]').click();
   await page.locator('[data-testid="task-delete-confirm"]').click();
 
   // Task should be gone from all columns
-  await expect(page.locator('[data-column="open"]').first()).not.toContainText(TASK_TITLE, { timeout: 10000 });
+  await expect(openColumn).not.toContainText(TASK_TITLE, { timeout: 10000 });
 });

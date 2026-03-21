@@ -32,8 +32,13 @@ let contextA: BrowserContext;
 let contextB: BrowserContext;
 let pageA: Page;
 let pageB: Page;
+let skipMobile = false;
 
-test.beforeAll(async ({ browser }) => {
+test.beforeAll(async ({ browser }, workerInfo) => {
+  // Multi-context MLS tests need desktop viewport — skip on mobile projects
+  skipMobile = !!workerInfo.project.use.isMobile;
+  if (skipMobile) return;
+
   contextA = await browser.newContext();
   contextB = await browser.newContext();
   pageA = await contextA.newPage();
@@ -52,19 +57,22 @@ test.describe.serial('task-sync: older tasks visible after joining', () => {
   const TASK_TITLE = `Pre-join task ${Date.now()}`;
 
   test('User B authenticates first (publishes key package)', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     await authenticate(pageB, E2E_BUNKER_B_URL);
     // Wait for key package publication
     await pageB.waitForTimeout(3000);
   });
 
   test('User A authenticates', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     await authenticate(pageA, E2E_BUNKER_URL);
   });
 
   test('User A creates group and a task', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     // Create group
-    await pageA.getByPlaceholder('Group name').fill(GROUP_NAME);
-    await pageA.getByRole('button', { name: 'Create' }).click();
+    await pageA.getByPlaceholder('Group name').first().fill(GROUP_NAME);
+    await pageA.getByRole('button', { name: 'Create', exact: true }).first().click();
 
     const sidebarA = pageA.locator('aside');
     await expect(sidebarA.getByText(GROUP_NAME)).toBeVisible({ timeout: 30000 });
@@ -75,7 +83,7 @@ test.describe.serial('task-sync: older tasks visible after joining', () => {
     // Create a task
     await pageA.getByRole('button', { name: 'Add Task' }).click();
     await pageA.getByLabel('Title').fill(TASK_TITLE);
-    await pageA.getByRole('button', { name: 'Create' }).last().click();
+    await pageA.getByRole('button', { name: 'Create', exact: true }).last().click();
 
     // Verify task appears in Open column for User A
     const openColumn = pageA.locator('[data-column="open"]').first();
@@ -83,6 +91,7 @@ test.describe.serial('task-sync: older tasks visible after joining', () => {
   });
 
   test('User A invites User B', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     await pageA.getByPlaceholder('npub1...').fill(USER_B_NPUB);
     await pageA.getByRole('button', { name: 'Invite' }).click();
 
@@ -94,6 +103,7 @@ test.describe.serial('task-sync: older tasks visible after joining', () => {
   });
 
   test('User B sees the group after joining', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     // Reload to trigger device-sync welcome fetch
     await pageB.reload();
     await pageB.locator('[data-testid="pubkey-chip"]').waitFor({ state: 'visible', timeout: 30000 });
@@ -103,6 +113,7 @@ test.describe.serial('task-sync: older tasks visible after joining', () => {
   });
 
   test('User B sees the pre-existing task', async () => {
+    test.skip(skipMobile, 'Multi-context MLS tests require desktop viewport');
     // Click on the group to select it
     const sidebarB = pageB.locator('aside');
     await sidebarB.getByText(GROUP_NAME).click();

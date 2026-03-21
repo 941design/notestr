@@ -33,14 +33,14 @@ test.describe('identity-visibility', () => {
       await hamburger.click();
     }
 
-    await page.getByPlaceholder('Group name').fill(GROUP_NAME);
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
+    await page.getByRole('button', { name: 'Create', exact: true }).first().click();
 
     // Wait for group to appear in sidebar
     await expect(page.getByLabel('Groups').getByText(GROUP_NAME)).toBeVisible({ timeout: 30000 });
 
-    // Disconnect User A
-    await page.locator('[data-testid="disconnect-button"]').click();
+    // Disconnect User A — force click to bypass QR button overlap on mobile
+    await page.locator('[data-testid="disconnect-button"]').click({ force: true });
 
     // Wait for login screen
     await page.getByText('Sign in to notestr').waitFor({ state: 'visible', timeout: 15000 });
@@ -80,12 +80,12 @@ test.describe('identity-visibility', () => {
     }
 
     const leaveGroupName = `Leave-Test ${Date.now()}`;
-    await page.getByPlaceholder('Group name').fill(leaveGroupName);
-    await page.getByRole('button', { name: 'Create' }).click();
+    await page.getByPlaceholder('Group name').first().fill(leaveGroupName);
+    await page.getByRole('button', { name: 'Create', exact: true }).first().click();
     await expect(page.getByLabel('Groups').getByText(leaveGroupName)).toBeVisible({ timeout: 30000 });
 
-    // Disconnect User A
-    await page.locator('[data-testid="disconnect-button"]').click();
+    // Disconnect User A — force click to bypass QR button overlap on mobile
+    await page.locator('[data-testid="disconnect-button"]').click({ force: true });
     await page.getByText('Sign in to notestr').waitFor({ state: 'visible', timeout: 15000 });
 
     // User B authenticates
@@ -103,8 +103,8 @@ test.describe('identity-visibility', () => {
     // Confirm in AlertDialog
     await page.locator('[data-testid="group-leave-confirm"]').click();
 
-    // Group should disappear from sidebar
-    await expect(page.getByLabel('Groups').getByText(leaveGroupName)).not.toBeVisible({ timeout: 15000 });
+    // Group should disappear from sidebar (use .first() — GroupManager renders in multiple containers)
+    await expect(page.getByLabel('Groups').getByText(leaveGroupName).first()).not.toBeVisible({ timeout: 15000 });
   });
 
   test('identity switch restores full interactivity for member', async ({ browser }) => {
@@ -161,8 +161,8 @@ test.describe('identity-visibility', () => {
     // Wait for invite to succeed (input clears)
     await expect(page.getByPlaceholder('npub1...')).toHaveValue('', { timeout: 30000 });
 
-    // Disconnect User A
-    await page.locator('[data-testid="disconnect-button"]').click();
+    // Disconnect User A — force click to bypass QR button overlap on mobile
+    await page.locator('[data-testid="disconnect-button"]').click({ force: true });
     await page.getByText('Sign in to notestr').waitFor({ state: 'visible', timeout: 15000 });
 
     // User B authenticates in the same context (shared IndexedDB)

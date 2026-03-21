@@ -30,9 +30,9 @@ async function getConsoleErrors(page: any) {
 }
 
 test.describe('Viewport Audit', () => {
-  test('Desktop 1440x900', async ({ page, context }) => {
+  test('Desktop 1440x900', async ({ page }) => {
     // Set viewport
-    await context.setViewportSize({ width: 1440, height: 900 });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -47,8 +47,8 @@ test.describe('Viewport Audit', () => {
     console.log('✓ Desktop 1440x900 captured');
   });
 
-  test('Tablet 768x1024', async ({ page, context }) => {
-    await context.setViewportSize({ width: 768, height: 1024 });
+  test('Tablet 768x1024', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -61,8 +61,8 @@ test.describe('Viewport Audit', () => {
     console.log('✓ Tablet 768x1024 captured');
   });
 
-  test('Mobile 375x812', async ({ page, context }) => {
-    await context.setViewportSize({ width: 375, height: 812 });
+  test('Mobile 375x812', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -75,8 +75,8 @@ test.describe('Viewport Audit', () => {
     console.log('✓ Mobile 375x812 captured');
   });
 
-  test('Small Mobile 320x568', async ({ page, context }) => {
-    await context.setViewportSize({ width: 320, height: 568 });
+  test('Small Mobile 320x568', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -86,8 +86,8 @@ test.describe('Viewport Audit', () => {
     console.log('✓ Small Mobile 320x568 captured');
   });
 
-  test('Dark Mode 1440x900', async ({ page, context }) => {
-    await context.setViewportSize({ width: 1440, height: 900 });
+  test('Dark Mode 1440x900', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
@@ -107,8 +107,8 @@ test.describe('Viewport Audit', () => {
     console.log('✓ Dark Mode 1440x900 captured');
   });
 
-  test('Wide Desktop 1920x1080 Dark', async ({ page, context }) => {
-    await context.setViewportSize({ width: 1920, height: 1080 });
+  test('Wide Desktop 1920x1080 Dark', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');

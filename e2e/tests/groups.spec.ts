@@ -37,7 +37,7 @@ test('create group: name appears in sidebar', async ({ page }) => {
   await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
 
   // Click the Create button
-  await page.getByRole('button', { name: 'Create' }).first().click();
+  await page.getByRole('button', { name: 'Create', exact: true }).first().click();
 
   // Group name must appear in the sidebar group list
   const sidebar = page.locator('aside');
@@ -55,9 +55,15 @@ test('leave group: group removed from sidebar after confirmation', async ({ page
 
   // Create a group
   await page.getByPlaceholder('Group name').first().fill(GROUP_NAME);
-  await page.getByRole('button', { name: 'Create' }).first().click();
+  await page.getByRole('button', { name: 'Create', exact: true }).first().click();
   const sidebar = page.locator('aside');
   await expect(sidebar.getByText(GROUP_NAME).first()).toBeVisible({ timeout: 30000 });
+
+  // On mobile, drawer closes after group selection — reopen it
+  if (isMobile(page)) {
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.waitForTimeout(250);
+  }
 
   // Click Leave — confirmation dialog should appear
   await page.locator('[data-testid="group-leave-btn"]').first().click();

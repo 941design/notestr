@@ -40,14 +40,19 @@ async function spawnAndWaitForOutput(
       if (!settled && text.includes(waitFor)) {
         settled = true;
         clearTimeout(timer);
+        // Stop forwarding stdout/stderr once the process is ready
+        child.stdout?.removeListener('data', onData);
+        child.stderr?.removeListener('data', onStderr);
         resolve(child);
       }
     }
 
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', (data: Buffer) => {
+    const onStderr = (data: Buffer) => {
       process.stderr.write(`[${cmd}:err] ${data.toString()}`);
-    });
+    };
+
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onStderr);
 
     child.on('error', (err) => {
       if (!settled) {
@@ -79,6 +84,25 @@ async function waitForHttp(url: string, timeoutMs: number): Promise<void> {
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`Timed out waiting for ${url} to respond`);
+}
+
+async function killProcessOnPort(port: number): Promise<void> {
+  try {
+    const { execSync } = await import('child_process');
+    const pids = execSync(`lsof -ti:${port}`, { encoding: 'utf-8' }).trim();
+    if (pids) {
+      for (const pid of pids.split('\n')) {
+        try {
+          process.kill(Number(pid), 'SIGKILL');
+          console.log(`[setup] Killed stale process on port ${port} (PID ${pid})`);
+        } catch { /* already dead */ }
+      }
+      // Give OS time to release the port
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  } catch {
+    // lsof exits non-zero when no process found — port is free
+  }
 }
 
 export default async function globalSetup() {
@@ -127,7 +151,10 @@ export default async function globalSetup() {
   );
   console.log('[setup] Bunker B ready.');
 
-  // 3. Start the static file server
+  // 3. Kill any stale serve process on port 3100 before starting
+  await killProcessOnPort(3100);
+
+  // 4. Start the static file server
   console.log('[setup] Starting serve on port 3100...');
   const serveProc = await spawnAndWaitForOutput(
     'npx',
@@ -138,7 +165,7 @@ export default async function globalSetup() {
   );
   console.log('[setup] Serve ready.');
 
-  // 4. Also do an HTTP health-check to be sure
+  // 5. Also do an HTTP health-check to be sure
   await waitForHttp('http://localhost:3100', 10000);
   console.log('[setup] HTTP health check passed.');
 
